@@ -26,6 +26,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    private static final String TRACE_ID_KEY = "traceId";
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
@@ -97,7 +99,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
-        String traceId = MDC.get("traceId");
+        String traceId = MDC.get(TRACE_ID_KEY);
         log.warn("Validation error [traceId={}]: {}", traceId, ex.getMessage());
 
         ProblemDetail problemDetail = ex.getBody();
@@ -112,7 +114,7 @@ public class GlobalExceptionHandler {
 
         problemDetail.setProperty("violations", violations);
         if (traceId != null) {
-            problemDetail.setProperty("traceId", traceId);
+            problemDetail.setProperty(TRACE_ID_KEY, traceId);
         }
 
         return problemDetail;
@@ -133,7 +135,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleAllUncaughtException(Exception ex) {
-        String traceId = MDC.get("traceId");
+        String traceId = MDC.get(TRACE_ID_KEY);
 
         log.error("Unknown error occurred [traceId={}]", traceId, ex);
 
@@ -144,7 +146,7 @@ public class GlobalExceptionHandler {
         problemDetail.setTitle("Internal server error");
 
         if (traceId != null) {
-            problemDetail.setProperty("traceId", traceId);
+            problemDetail.setProperty(TRACE_ID_KEY, traceId);
         }
 
         return problemDetail;

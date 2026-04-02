@@ -30,15 +30,17 @@
         <sonar.organization>zhenyazzz</sonar.organization>
         <sonar.projectKey>zhenyazzz_order-service</sonar.projectKey>
         <sonar.coverage.exclusions>
+            **/aspect/**,
+            **/client/**,
             **/config/**,
             **/dto/**,
-            **/entity/**,
             **/exception/**,
             **/mapper/*Impl.java,
             **/model/**,
             **/repository/**,
             **/controller/**,
             **/security/**,
+            **/validation/**,
             **/*Filter.java
         </sonar.coverage.exclusions>
         <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>

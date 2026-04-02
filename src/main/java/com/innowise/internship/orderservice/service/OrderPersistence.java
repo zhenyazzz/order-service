@@ -36,6 +36,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class OrderPersistence {
 
+    private static final String ORDER_NOT_FOUND_MESSAGE = "Order not found";
+
     private final OrderRepository orderRepository;
     private final ItemRepository itemRepository;
     private final OrderMapper orderMapper;
@@ -44,13 +46,13 @@ public class OrderPersistence {
     @Transactional(readOnly = true)
     public Order findById(UUID id) {
         return orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
     }
 
     @Transactional(readOnly = true)
     public Order findByIdAndUserId(UUID id, UUID userId) {
         Order order = orderRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
         validateOrderModifiable(order);
         return order;
     }
@@ -105,7 +107,7 @@ public class OrderPersistence {
     @Transactional
     public Order updateOrder(UUID orderId, UpdateOrderRequest request) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
         
         validateOrderModifiable(order);
         

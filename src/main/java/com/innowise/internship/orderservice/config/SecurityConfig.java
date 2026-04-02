@@ -15,6 +15,8 @@ import com.innowise.internship.orderservice.security.HeaderAuthenticationFilter;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final String ADMIN_ROLE = "ADMIN";
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, HeaderAuthenticationFilter headerAuthenticationFilter) throws Exception {
         http
@@ -28,11 +30,11 @@ public class SecurityConfig {
                 ).permitAll()
                 .requestMatchers("/orders/me", "/orders/me/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/orders").authenticated()
-                .requestMatchers(HttpMethod.GET, "/orders").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/orders/user/*").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/orders/*").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/orders/*/cancel").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/orders/*").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/orders").hasRole(ADMIN_ROLE)
+                .requestMatchers(HttpMethod.GET, "/orders/user/*").hasRole(ADMIN_ROLE)
+                .requestMatchers(HttpMethod.GET, "/orders/*").hasRole(ADMIN_ROLE)
+                .requestMatchers(HttpMethod.POST, "/orders/*/cancel").hasRole(ADMIN_ROLE)
+                .requestMatchers(HttpMethod.DELETE, "/orders/*").hasRole(ADMIN_ROLE)
                 .anyRequest().authenticated()
             )
             .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
