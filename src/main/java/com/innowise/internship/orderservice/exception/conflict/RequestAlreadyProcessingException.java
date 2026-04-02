@@ -1,4 +1,4 @@
-package com.innowise.internship.orderservice.exception;
+package com.innowise.internship.orderservice.exception.conflict;
 
 public class RequestAlreadyProcessingException extends RuntimeException {
 
@@ -10,4 +10,3 @@ public class RequestAlreadyProcessingException extends RuntimeException {
         super(message, cause);
     }
 }
-

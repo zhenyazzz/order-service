@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import com.innowise.internship.orderservice.exception.SecurityContextException;
+import com.innowise.internship.orderservice.exception.security.SecurityContextException;
 
 import lombok.experimental.UtilityClass;
 

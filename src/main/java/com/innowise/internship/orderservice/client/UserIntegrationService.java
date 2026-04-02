@@ -6,8 +6,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.innowise.internship.orderservice.dto.internal.UserResponse;
-import com.innowise.internship.orderservice.exception.UserNotFoundException;
-import com.innowise.internship.orderservice.exception.UserServiceUnavailableException;
+import com.innowise.internship.orderservice.exception.integration.UserServiceUnavailableException;
+import com.innowise.internship.orderservice.exception.notfound.UserNotFoundException;
 
 import feign.FeignException;
 
@@ -44,6 +44,14 @@ public class UserIntegrationService {
     }
 
     private UserResponse getInternalUserByIdFallback(UUID id, Throwable throwable) {
+        if (throwable instanceof UserNotFoundException userNotFoundException) {
+            throw userNotFoundException;
+        }
+
+        if (throwable instanceof feign.FeignException feignException && feignException.status() == 404) {
+            throw new UserNotFoundException("User not found for id: " + id);
+        }
+
         log.warn("User service call failed for userId={}, falling back: {}", id, throwable.toString());
         throw new UserServiceUnavailableException(
                 "User service is unavailable. Please retry later.",

@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
-import com.innowise.internship.orderservice.exception.RequestAlreadyProcessingException;
+import com.innowise.internship.orderservice.exception.conflict.RequestAlreadyProcessingException;
 import com.innowise.internship.orderservice.security.SecurityUtils;
 
 @Aspect

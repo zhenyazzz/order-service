@@ -1,4 +1,15 @@
 spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${ORDER_POSTGRES_PORT:5433}/${POSTGRES_DB:order_service_db}
+    username: ${POSTGRES_USER:order_service}
+    password: ${POSTGRES_PASSWORD:order_service_secret}
+    driver-class-name: org.postgresql.Driver
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${ORDER_REDIS_PORT:6380}
+
   liquibase:
     contexts: dev
   jpa:

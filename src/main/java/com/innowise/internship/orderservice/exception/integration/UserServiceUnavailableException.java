@@ -1,4 +1,4 @@
-package com.innowise.internship.orderservice.exception;
+package com.innowise.internship.orderservice.exception.integration;
 
 public class UserServiceUnavailableException extends RuntimeException {
 

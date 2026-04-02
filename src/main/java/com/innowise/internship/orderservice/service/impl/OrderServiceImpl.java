@@ -17,7 +17,7 @@ import com.innowise.internship.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.internship.orderservice.dto.request.OrderSearchFilterRequest;
 import com.innowise.internship.orderservice.dto.request.UpdateOrderRequest;
 import com.innowise.internship.orderservice.dto.response.OrderResponse;
-import com.innowise.internship.orderservice.exception.OrderAlreadyCancelledException;
+import com.innowise.internship.orderservice.exception.conflict.OrderAlreadyCancelledException;
 import com.innowise.internship.orderservice.service.OrderPersistence;
 import com.innowise.internship.orderservice.service.OrderService;
 

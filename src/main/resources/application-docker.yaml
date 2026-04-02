@@ -11,4 +11,4 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:6379}
 
 user-service:
-  url: ${USER_SERVICE_URL:http://user-service:8081}
+  url: ${USER_SERVICE_URL:http://host.docker.internal:8082}

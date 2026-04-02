@@ -11,6 +11,14 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import com.innowise.internship.orderservice.exception.conflict.InvalidOrderStateException;
+import com.innowise.internship.orderservice.exception.conflict.OrderAlreadyCancelledException;
+import com.innowise.internship.orderservice.exception.conflict.RequestAlreadyProcessingException;
+import com.innowise.internship.orderservice.exception.integration.UserServiceUnavailableException;
+import com.innowise.internship.orderservice.exception.notfound.ResourceNotFoundException;
+import com.innowise.internship.orderservice.exception.security.SecurityContextException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -55,7 +63,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleInvalidOrderStateException(InvalidOrderStateException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Invalid order state");
-        
+
         return problemDetail;
     }
 
@@ -108,6 +116,19 @@ public class GlobalExceptionHandler {
         }
 
         return problemDetail;
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String message = "Invalid value for parameter '" + ex.getName() + "'";
+        if (ex.getRequiredType() != null) {
+            message += ": expected " + ex.getRequiredType().getSimpleName();
+        }
+        if (ex.getValue() != null) {
+            message += ", got '" + ex.getValue() + "'";
+        }
+
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, message);
     }
 
     @ExceptionHandler(Exception.class)
