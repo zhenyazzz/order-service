@@ -88,7 +88,7 @@ public class OrderPersistence {
                     }
                     return orderItemMapper.toEntity(orderItemRequest, item);
                 })
-                .collect(Collectors.toList());
+                .toList();
         Order order = orderMapper.toEntity(userResponse.id(), orderItems);
         orderRepository.save(order);
         return orderMapper.toResponse(order);
@@ -130,7 +130,7 @@ public class OrderPersistence {
                     order.addOrderItem(orderItem);
                     return orderItem;
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         if (newOrderItems.isEmpty()) {
             throw new InvalidOrderStateException("Order must contain at least one item");

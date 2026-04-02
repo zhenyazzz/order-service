@@ -18,12 +18,10 @@ public class DateRangeValidator implements ConstraintValidator<ValidDateRange, O
             return true;
         }
 
-        // Один параметр — ок (фильтр «с даты» или «по дату» без второй границы)
         if (value.createdFrom() == null || value.createdTo() == null) {
-            return true;
+            return false;
         }
 
-        // Обе границы: from не позже to (совпадение допустимо — совпадает с семантикой between в Specification)
         if (value.createdFrom().isAfter(value.createdTo())) {
             context.disableDefaultConstraintViolation();
             context.buildConstraintViolationWithTemplate(

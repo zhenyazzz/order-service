@@ -11,6 +11,8 @@ import java.util.UUID;
 
 public final class OrderSpecification {
 
+    private static final String CREATED_AT_FIELD = "createdAt";
+
     private OrderSpecification() {
     }
 
@@ -25,12 +27,12 @@ public final class OrderSpecification {
                 return cb.conjunction();
             }
             if (startDate != null && endDate != null) {
-                return cb.between(root.get("createdAt"), startDate, endDate);
+                return cb.between(root.get(CREATED_AT_FIELD), startDate, endDate);
             }
             if (startDate != null) {
-                return cb.greaterThanOrEqualTo(root.get("createdAt"), startDate);
+                return cb.greaterThanOrEqualTo(root.get(CREATED_AT_FIELD), startDate);
             }
-            return cb.lessThanOrEqualTo(root.get("createdAt"), endDate);
+            return cb.lessThanOrEqualTo(root.get(CREATED_AT_FIELD), endDate);
         };
     }
 

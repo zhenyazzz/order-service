@@ -3,7 +3,6 @@ package com.innowise.internship.orderservice.security;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -41,7 +40,7 @@ public class SecurityUtils {
         return getCurrentUser()
                 .map(user -> user.roles().stream()
                     .map(Roles::getAuthority)
-                    .collect(Collectors.toList()))
+                    .toList())
                 .orElseThrow(() -> new SecurityContextException(USER_NOT_FOUND_MESSAGE));
     }
 

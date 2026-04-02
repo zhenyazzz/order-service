@@ -37,7 +37,6 @@ public class OrderServiceImpl implements OrderService {
     private final UserIntegrationService userIntegrationService;
     private final OrderMapper orderMapper;
 
-    // No @Transactional - HTTP calls to user-service must not hold DB connections
     @Override
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request) {
         UserResponse userResponse = userIntegrationService.getInternalUserById(userId);
