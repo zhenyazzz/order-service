@@ -1,0 +1,144 @@
+package com.innowise.internship.orderservice.service;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.innowise.internship.orderservice.dto.internal.UserResponse;
+import com.innowise.internship.orderservice.dto.request.CreateOrderRequest;
+import com.innowise.internship.orderservice.dto.request.OrderItemRequest;
+import com.innowise.internship.orderservice.dto.request.UpdateOrderRequest;
+import com.innowise.internship.orderservice.dto.response.OrderResponse;
+import com.innowise.internship.orderservice.exception.InvalidOrderStateException;
+import com.innowise.internship.orderservice.exception.ItemNotFoundException;
+import com.innowise.internship.orderservice.exception.OrderNotFoundException;
+import com.innowise.internship.orderservice.model.enums.OrderStatus;
+import com.innowise.internship.orderservice.mapper.OrderItemMapper;
+import com.innowise.internship.orderservice.mapper.OrderMapper;
+import com.innowise.internship.orderservice.model.Item;
+import com.innowise.internship.orderservice.model.Order;
+import com.innowise.internship.orderservice.model.OrderItem;
+import com.innowise.internship.orderservice.repository.ItemRepository;
+import com.innowise.internship.orderservice.repository.OrderRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+public class OrderPersistence {
+
+    private final OrderRepository orderRepository;
+    private final ItemRepository itemRepository;
+    private final OrderMapper orderMapper;
+    private final OrderItemMapper orderItemMapper;
+
+    @Transactional(readOnly = true)
+    public Order findById(UUID id) {
+        return orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public Order findByIdAndUserId(UUID id, UUID userId) {
+        Order order = orderRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+        validateOrderModifiable(order);
+        return order;
+    }
+
+    private void validateOrderModifiable(Order order) {
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new InvalidOrderStateException(
+                "Cannot modify order with status: " + order.getStatus() + ". Only PENDING orders can be modified."
+            );
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Order> findAll(Specification<Order> spec, Pageable pageable) {
+        return orderRepository.findAll(spec, pageable);
+    }
+
+    @Transactional
+    public OrderResponse saveNewOrder(UserResponse userResponse, CreateOrderRequest request) {
+        List<OrderItemRequest> orderItemRequests = request.orderItems();
+        List<UUID> itemIds = orderItemRequests.stream()
+                .map(OrderItemRequest::itemId)
+                .distinct()
+                .toList();
+        Map<UUID, Item> itemsById = itemRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(Item::getId, Function.identity()));
+
+        List<OrderItem> orderItems = orderItemRequests.stream()
+                .map(orderItemRequest -> {
+                    Item item = itemsById.get(orderItemRequest.itemId());
+                    if (item == null) {
+                        throw new ItemNotFoundException("Item not found: " + orderItemRequest.itemId());
+                    }
+                    return orderItemMapper.toEntity(orderItemRequest, item);
+                })
+                .collect(Collectors.toList());
+        Order order = orderMapper.toEntity(userResponse.id(), orderItems);
+        orderRepository.save(order);
+        return orderMapper.toResponse(order);
+    }
+
+    @Transactional
+    public Order save(Order order) {
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public void delete(Order order) {
+        orderRepository.delete(order);
+    }
+
+    @Transactional
+    public Order updateOrder(UUID orderId, UpdateOrderRequest request) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found"));
+        
+        validateOrderModifiable(order);
+        
+        order.getOrderItems().clear();
+
+        List<UUID> itemIds = request.orderItems().stream()
+                .map(OrderItemRequest::itemId)
+                .distinct()
+                .toList();
+        Map<UUID, Item> itemsById = itemRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(Item::getId, Function.identity()));
+
+        List<OrderItem> newOrderItems = request.orderItems().stream()
+                .map(orderItemRequest -> {
+                    Item item = itemsById.get(orderItemRequest.itemId());
+                    if (item == null) {
+                        throw new ItemNotFoundException("Item not found: " + orderItemRequest.itemId());
+                    }
+                    OrderItem orderItem = orderItemMapper.toEntity(orderItemRequest, item);
+                    order.addOrderItem(orderItem);
+                    return orderItem;
+                })
+                .collect(Collectors.toList());
+
+        if (newOrderItems.isEmpty()) {
+            throw new InvalidOrderStateException("Order must contain at least one item");
+        }
+
+        BigDecimal newTotalPrice = newOrderItems.stream()
+                .map(oi -> oi.getItem().getPrice().multiply(BigDecimal.valueOf(oi.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        order.setTotalPrice(newTotalPrice);
+
+        return orderRepository.save(order);
+    }
+}
