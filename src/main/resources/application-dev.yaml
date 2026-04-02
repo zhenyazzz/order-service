@@ -1,0 +1,8 @@
+spring:
+  liquibase:
+    contexts: dev
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true

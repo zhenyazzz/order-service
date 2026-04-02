@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://order-service-postgresql:5432/order_service_db}
+    username: ${SPRING_DATASOURCE_USERNAME:order_service}
+    password: ${SPRING_DATASOURCE_PASSWORD:order_service_secret}
+    driver-class-name: org.postgresql.Driver
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+user-service:
+  url: ${USER_SERVICE_URL:http://user-service:8081}

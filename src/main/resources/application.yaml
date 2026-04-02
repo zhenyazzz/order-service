@@ -1,9 +1,72 @@
 server:
   port: 8080
 
+user-service:
+  url: ${USER_SERVICE_URL:http://localhost:8081}
+
+idempotency:
+  processing-ttl-minutes: 5 
+
 spring:
   application:
     name: order-service
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
+  datasource:
+    url: jdbc:postgresql://localhost:5432/order_service
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      user-service:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        ignoreExceptions:
+          - feign.FeignException.NotFound
+          - feign.FeignException.BadRequest
+        recordExceptions:
+          - feign.FeignException.InternalServerError
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+  retry:
+      instances:
+        user-service:
+          maxAttempts: 3
+          waitDuration: 1s
+          enableExponentialBackoff: true
+          exponentialBackoffMultiplier: 2
+          retryExceptions:
+            - feign.FeignException.InternalServerError
+            - feign.FeignException.ServiceUnavailable
+            - feign.FeignException.GatewayTimeout
+            - java.io.IOException
+          ignoreExceptions:
+            - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+            - feign.FeignException.NotFound
+            - feign.FeignException.BadRequest
