@@ -9,8 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.util.UUID;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,9 +28,9 @@ import com.innowise.internship.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.internship.orderservice.dto.request.OrderSearchFilterRequest;
 import com.innowise.internship.orderservice.dto.request.UpdateOrderRequest;
 import com.innowise.internship.orderservice.dto.response.OrderResponse;
-import com.innowise.internship.orderservice.exception.OrderAlreadyCancelledException;
-import com.innowise.internship.orderservice.exception.OrderNotFoundException;
-import com.innowise.internship.orderservice.exception.UserNotFoundException;
+import com.innowise.internship.orderservice.exception.conflict.OrderAlreadyCancelledException;
+import com.innowise.internship.orderservice.exception.notfound.OrderNotFoundException;
+import com.innowise.internship.orderservice.exception.notfound.UserNotFoundException;
 import com.innowise.internship.orderservice.mapper.OrderMapper;
 import com.innowise.internship.orderservice.model.Order;
 import com.innowise.internship.orderservice.model.enums.OrderStatus;
