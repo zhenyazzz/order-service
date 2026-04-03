@@ -137,6 +137,38 @@ class OrderPersistenceTest {
     }
 
     @Nested
+    @DisplayName("cancelById / cancelByIdAndUserId")
+    class Cancel {
+
+        @Test
+        @DisplayName("cancelById changes status to CANCELLED and saves")
+        void cancelById_updatesStatusAndSaves() {
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+
+            when(orderRepository.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.save(order)).thenReturn(order);
+
+            Order result = orderPersistence.cancelById(OrderTestDataFactory.ORDER_ID);
+
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            verify(orderRepository).save(order);
+        }
+
+        @Test
+        @DisplayName("cancelByIdAndUserId throws when already cancelled")
+        void cancelByIdAndUserId_whenCancelled_throws() {
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED);
+
+            when(orderRepository.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+                    .thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() -> orderPersistence.cancelByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+                    .isInstanceOf(com.innowise.internship.orderservice.exception.conflict.OrderAlreadyCancelledException.class)
+                    .hasMessageContaining("already cancelled");
+        }
+    }
+
+    @Nested
     @DisplayName("saveNewOrder")
     class SaveNewOrder {
 
@@ -176,7 +208,8 @@ class OrderPersistenceTest {
             item.setId(OrderTestDataFactory.ITEM_ID);
             item.setPrice(BigDecimal.valueOf(25.50));
 
-            when(orderRepository.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+                    .thenReturn(Optional.of(order));
             when(itemRepository.findAllById(any())).thenReturn(List.of(item));
             when(orderItemMapper.toEntity(any(), any())).thenAnswer(inv -> {
                 OrderItem oi = new OrderItem();
@@ -186,7 +219,7 @@ class OrderPersistenceTest {
             });
             when(orderRepository.save(order)).thenReturn(order);
 
-            Order result = orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, request);
+            Order result = orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request);
 
             assertThat(result.getTotalPrice()).isEqualTo(BigDecimal.valueOf(51.00));
             verify(orderRepository).save(order);
@@ -197,9 +230,10 @@ class OrderPersistenceTest {
         void whenNotFound_throws() {
             UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
 
-            when(orderRepository.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(Optional.empty());
+            when(orderRepository.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+                    .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, request))
+            assertThatThrownBy(() -> orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request))
                     .isInstanceOf(OrderNotFoundException.class);
         }
 
@@ -209,9 +243,10 @@ class OrderPersistenceTest {
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.CONFIRMED);
             UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
 
-            when(orderRepository.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+                    .thenReturn(Optional.of(order));
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, request))
+            assertThatThrownBy(() -> orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request))
                     .isInstanceOf(InvalidOrderStateException.class)
                     .hasMessageContaining("Only PENDING orders can be modified");
         }
@@ -222,9 +257,10 @@ class OrderPersistenceTest {
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
             UpdateOrderRequest request = new UpdateOrderRequest(List.of());
 
-            when(orderRepository.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+                    .thenReturn(Optional.of(order));
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, request))
+            assertThatThrownBy(() -> orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request))
                     .isInstanceOf(InvalidOrderStateException.class)
                     .hasMessageContaining("at least one item");
         }

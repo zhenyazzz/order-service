@@ -10,21 +10,18 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.innowise.internship.orderservice.dto.internal.UserResponse;
 import com.innowise.internship.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.internship.orderservice.dto.request.OrderSearchFilterRequest;
 import com.innowise.internship.orderservice.dto.request.UpdateOrderRequest;
 import com.innowise.internship.orderservice.dto.response.OrderResponse;
-import com.innowise.internship.orderservice.exception.conflict.OrderAlreadyCancelledException;
 import com.innowise.internship.orderservice.service.OrderPersistence;
 import com.innowise.internship.orderservice.service.OrderService;
 
 import com.innowise.internship.orderservice.client.UserIntegrationService;
+import com.innowise.internship.orderservice.exception.security.SecurityContextException;
 import com.innowise.internship.orderservice.mapper.OrderMapper;
 import com.innowise.internship.orderservice.model.Order;
-import com.innowise.internship.orderservice.model.enums.OrderStatus;
 import com.innowise.internship.orderservice.repository.specification.OrderSpecification;
 
 import lombok.RequiredArgsConstructor;
@@ -46,15 +43,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse getMyOrderById(UUID orderId, UUID currentUserId) {
         Order order = orderPersistence.findByIdAndUserId(orderId, currentUserId);
-        UserResponse user = userIntegrationService.getInternalUserById(order.getUserId());
-        return orderMapper.toResponse(order, user);
+        return toResponseWithUser(order);
     }
 
     @Override
     public OrderResponse getOrderById(UUID orderId) {
         Order order = orderPersistence.findById(orderId);
-        UserResponse user = userIntegrationService.getInternalUserById(order.getUserId());
-        return orderMapper.toResponse(order, user);
+        return toResponseWithUser(order);
     }
 
     @Override
@@ -73,41 +68,34 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
     public OrderResponse cancelMyOrder(UUID orderId, UUID currentUserId) {
-        Order order = orderPersistence.findByIdAndUserId(orderId, currentUserId);
-        return cancelLoadedOrder(order);
+        Order order = orderPersistence.cancelByIdAndUserId(orderId, currentUserId);
+        return toResponseWithUser(order);
     }
 
     @Override
-    @Transactional
     public OrderResponse cancelOrder(UUID orderId) {
-        Order order = orderPersistence.findById(orderId);
-        return cancelLoadedOrder(order);
-    }
-
-    private OrderResponse cancelLoadedOrder(Order order) {
-        if (order.getStatus().isCancelled()) {
-            throw new OrderAlreadyCancelledException("Order is already cancelled");
-        }
-        order.setStatus(OrderStatus.CANCELLED);
-        Order saved = orderPersistence.save(order);
-        return orderMapper.toResponse(saved);
+        Order order = orderPersistence.cancelById(orderId);
+        return toResponseWithUser(order);
     }
 
     @Override
     public OrderResponse updateMyOrder(UUID orderId, UUID currentUserId, UpdateOrderRequest request) {
-        Order order = orderPersistence.findByIdAndUserId(orderId, currentUserId);
-        UserResponse user = userIntegrationService.getInternalUserById(order.getUserId());
-        Order updatedOrder = orderPersistence.updateOrder(orderId, request);
-        return orderMapper.toResponse(updatedOrder, user);
+        if (currentUserId == null) {
+            throw new SecurityContextException("Current user is not authenticated");
+        }
+        Order updatedOrder = orderPersistence.updateOrder(orderId, currentUserId, request);
+        return toResponseWithUser(updatedOrder);
     }
 
     @Override
-    @Transactional
     public void deleteOrder(UUID orderId) {
-        Order order = orderPersistence.findById(orderId);
-        orderPersistence.delete(order);
+        orderPersistence.deleteById(orderId);
+    }
+
+    private OrderResponse toResponseWithUser(Order order) {
+        UserResponse user = userIntegrationService.getInternalUserById(order.getUserId());
+        return orderMapper.toResponse(order, user);
     }
 
     private Page<OrderResponse> findOrdersWithUserEnrichment(OrderSearchFilterRequest filter, Pageable pageable, UUID userId) {

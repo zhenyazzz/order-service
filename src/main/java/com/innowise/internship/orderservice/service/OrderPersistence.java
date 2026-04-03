@@ -19,6 +19,7 @@ import com.innowise.internship.orderservice.dto.request.OrderItemRequest;
 import com.innowise.internship.orderservice.dto.request.UpdateOrderRequest;
 import com.innowise.internship.orderservice.dto.response.OrderResponse;
 import com.innowise.internship.orderservice.exception.conflict.InvalidOrderStateException;
+import com.innowise.internship.orderservice.exception.conflict.OrderAlreadyCancelledException;
 import com.innowise.internship.orderservice.exception.notfound.ItemNotFoundException;
 import com.innowise.internship.orderservice.exception.notfound.OrderNotFoundException;
 import com.innowise.internship.orderservice.model.enums.OrderStatus;
@@ -71,6 +72,21 @@ public class OrderPersistence {
     }
 
     @Transactional
+    public Order cancelById(UUID orderId) {
+        Order order = findById(orderId);
+        cancelLoadedOrder(order);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order cancelByIdAndUserId(UUID orderId, UUID userId) {
+        Order order = orderRepository.findByIdAndUserId(orderId, userId)
+                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
+        cancelLoadedOrder(order);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
     public OrderResponse saveNewOrder(UserResponse userResponse, CreateOrderRequest request) {
         List<OrderItemRequest> orderItemRequests = request.orderItems();
         List<UUID> itemIds = orderItemRequests.stream()
@@ -100,15 +116,15 @@ public class OrderPersistence {
     }
 
     @Transactional
-    public void delete(Order order) {
+    public void deleteById(UUID orderId) {
+        Order order = findById(orderId);
         orderRepository.delete(order);
     }
 
     @Transactional
-    public Order updateOrder(UUID orderId, UpdateOrderRequest request) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
-        
+    public Order updateOrder(UUID orderId, UUID userId, UpdateOrderRequest request) {
+        Order order = orderRepository.findByIdAndUserId(orderId, userId)
+            .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
         validateOrderModifiable(order);
         
         order.getOrderItems().clear();
@@ -142,5 +158,12 @@ public class OrderPersistence {
         order.setTotalPrice(newTotalPrice);
 
         return orderRepository.save(order);
+    }
+
+    private void cancelLoadedOrder(Order order) {
+        if (order.getStatus().isCancelled()) {
+            throw new OrderAlreadyCancelledException("Order is already cancelled");
+        }
+        order.setStatus(OrderStatus.CANCELLED);
     }
 }

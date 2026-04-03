@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +33,7 @@ import com.innowise.internship.orderservice.dto.response.OrderResponse;
 import com.innowise.internship.orderservice.exception.conflict.OrderAlreadyCancelledException;
 import com.innowise.internship.orderservice.exception.notfound.OrderNotFoundException;
 import com.innowise.internship.orderservice.exception.notfound.UserNotFoundException;
+import com.innowise.internship.orderservice.exception.security.SecurityContextException;
 import com.innowise.internship.orderservice.mapper.OrderMapper;
 import com.innowise.internship.orderservice.model.Order;
 import com.innowise.internship.orderservice.model.enums.OrderStatus;
@@ -79,10 +82,12 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("when user integration throws UserNotFoundException does not persist")
         void whenUserMissing_throws() {
+            CreateOrderRequest request = OrderTestDataFactory.buildCreateOrderRequest();
+
             when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID))
                     .thenThrow(new UserNotFoundException("User not found for id: " + OrderTestDataFactory.USER_ID));
 
-            assertThatThrownBy(() -> orderService.createOrder(OrderTestDataFactory.USER_ID, OrderTestDataFactory.buildCreateOrderRequest()))
+            assertThatThrownBy(() -> orderService.createOrder(OrderTestDataFactory.USER_ID, request))
                     .isInstanceOf(UserNotFoundException.class)
                     .hasMessageContaining("User not found");
 
@@ -233,22 +238,21 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("when order exists and is pending updates order and returns response")
         void whenPending_updatesAndReturnsResponse() {
-            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
             UserResponse user = new UserResponse(OrderTestDataFactory.USER_ID, "Test", "User", null, OrderTestDataFactory.USER_EMAIL);
             Order updatedOrder = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
             OrderResponse out = OrderTestDataFactory.buildOrderResponse(updatedOrder);
             UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
 
-            when(orderPersistence.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
-                    .thenReturn(order);
             when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
-            when(orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, request)).thenReturn(updatedOrder);
+            when(orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request))
+                    .thenReturn(updatedOrder);
             when(orderMapper.toResponse(updatedOrder, user)).thenReturn(out);
 
             OrderResponse result = orderService.updateMyOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request);
 
             assertThat(result).isEqualTo(out);
-            verify(orderPersistence).updateOrder(OrderTestDataFactory.ORDER_ID, request);
+            verify(orderPersistence).updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request);
+            verify(userIntegrationService).getInternalUserById(OrderTestDataFactory.USER_ID);
         }
 
         @Test
@@ -256,13 +260,27 @@ class OrderServiceImplTest {
         void whenNotFound_throws() {
             UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
 
-            when(orderPersistence.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+            when(orderPersistence.updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request))
                     .thenThrow(new OrderNotFoundException("Order not found"));
 
             assertThatThrownBy(() -> orderService.updateMyOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request))
                     .isInstanceOf(OrderNotFoundException.class);
 
-            verify(orderPersistence, never()).updateOrder(any(), any());
+            verify(orderPersistence).updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request);
+            verify(userIntegrationService, never()).getInternalUserById(any());
+        }
+
+        @Test
+        @DisplayName("when current user is missing throws SecurityContextException")
+        void whenCurrentUserMissing_throws() {
+            UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
+
+            assertThatThrownBy(() -> orderService.updateMyOrder(OrderTestDataFactory.ORDER_ID, null, request))
+                    .isInstanceOf(SecurityContextException.class)
+                    .hasMessageContaining("not authenticated");
+
+            verify(orderPersistence, never()).updateOrder(any(), any(), any());
+            verify(userIntegrationService, never()).getInternalUserById(any());
         }
     }
 
@@ -274,32 +292,30 @@ class OrderServiceImplTest {
         @DisplayName("cancelMyOrder: loads by id and user, persists when not already cancelled")
         void cancelMyOrder_whenPending_savesCancelled() {
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
-            Order saved = OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED);
-            OrderResponse out = OrderTestDataFactory.buildOrderResponse(saved);
+            OrderResponse out = OrderTestDataFactory.buildOrderResponse(OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED));
+            UserResponse user = new UserResponse(OrderTestDataFactory.USER_ID, "Test", "User", null, OrderTestDataFactory.USER_EMAIL);
 
-            when(orderPersistence.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+            when(orderPersistence.cancelByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
                     .thenReturn(order);
-            when(orderPersistence.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(orderMapper.toResponse(any(Order.class))).thenReturn(out);
+            when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
+            when(orderMapper.toResponse(any(Order.class), eq(user))).thenReturn(out);
 
-            orderService.cancelMyOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID);
+            OrderResponse result = orderService.cancelMyOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID);
 
-            verify(orderPersistence).save(any(Order.class));
+            assertThat(result).isEqualTo(out);
+            verify(orderPersistence).cancelByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID);
+            verify(userIntegrationService).getInternalUserById(OrderTestDataFactory.USER_ID);
         }
 
         @Test
         @DisplayName("cancelMyOrder: when already cancelled throws OrderAlreadyCancelledException")
         void cancelMyOrder_whenAlreadyCancelled_throws() {
-            Order order = OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED);
-
-            when(orderPersistence.findByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
-                    .thenReturn(order);
+            when(orderPersistence.cancelByIdAndUserId(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
+                    .thenThrow(new OrderAlreadyCancelledException("Order is already cancelled"));
 
             assertThatThrownBy(() -> orderService.cancelMyOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID))
                     .isInstanceOf(OrderAlreadyCancelledException.class)
                     .hasMessageContaining("already cancelled");
-
-            verify(orderPersistence, never()).save(any(Order.class));
         }
 
         @Test
@@ -307,27 +323,27 @@ class OrderServiceImplTest {
         void cancelOrder_whenPending_saves() {
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
             OrderResponse out = OrderTestDataFactory.buildOrderResponse(OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED));
+            UserResponse user = new UserResponse(OrderTestDataFactory.USER_ID, "Test", "User", null, OrderTestDataFactory.USER_EMAIL);
 
-            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
-            when(orderPersistence.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(orderMapper.toResponse(any(Order.class))).thenReturn(out);
+            when(orderPersistence.cancelById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+            when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
+            when(orderMapper.toResponse(any(Order.class), eq(user))).thenReturn(out);
 
-            orderService.cancelOrder(OrderTestDataFactory.ORDER_ID);
+            OrderResponse result = orderService.cancelOrder(OrderTestDataFactory.ORDER_ID);
 
-            verify(orderPersistence).save(any(Order.class));
+            assertThat(result).isEqualTo(out);
+            verify(orderPersistence).cancelById(OrderTestDataFactory.ORDER_ID);
+            verify(userIntegrationService).getInternalUserById(OrderTestDataFactory.USER_ID);
         }
 
         @Test
         @DisplayName("cancelOrder (admin): when already cancelled throws OrderAlreadyCancelledException")
         void cancelOrder_whenAlreadyCancelled_throws() {
-            Order order = OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED);
-
-            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+            when(orderPersistence.cancelById(OrderTestDataFactory.ORDER_ID))
+                    .thenThrow(new OrderAlreadyCancelledException("Order is already cancelled"));
 
             assertThatThrownBy(() -> orderService.cancelOrder(OrderTestDataFactory.ORDER_ID))
                     .isInstanceOf(OrderAlreadyCancelledException.class);
-
-            verify(orderPersistence, never()).save(any(Order.class));
         }
     }
 
@@ -338,24 +354,23 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("when order exists calls repository delete")
         void whenFound_deletes() {
-            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
-            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+            doNothing().when(orderPersistence).deleteById(OrderTestDataFactory.ORDER_ID);
 
             orderService.deleteOrder(OrderTestDataFactory.ORDER_ID);
 
-            verify(orderPersistence).delete(order);
+            verify(orderPersistence).deleteById(OrderTestDataFactory.ORDER_ID);
         }
 
         @Test
         @DisplayName("when order missing throws OrderNotFoundException")
         void whenMissing_throws() {
-            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID))
-                    .thenThrow(new OrderNotFoundException("Order not found"));
+            doThrow(new OrderNotFoundException("Order not found"))
+                    .when(orderPersistence).deleteById(OrderTestDataFactory.ORDER_ID);
 
             assertThatThrownBy(() -> orderService.deleteOrder(OrderTestDataFactory.ORDER_ID))
                     .isInstanceOf(OrderNotFoundException.class);
 
-            verify(orderPersistence, never()).delete(any(Order.class));
+            verify(orderPersistence).deleteById(OrderTestDataFactory.ORDER_ID);
         }
     }
 }
