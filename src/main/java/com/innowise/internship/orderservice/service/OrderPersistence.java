@@ -73,7 +73,8 @@ public class OrderPersistence {
 
     @Transactional
     public Order cancelById(UUID orderId) {
-        Order order = findById(orderId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
         cancelLoadedOrder(order);
         return orderRepository.save(order);
     }
@@ -117,7 +118,8 @@ public class OrderPersistence {
 
     @Transactional
     public void deleteById(UUID orderId) {
-        Order order = findById(orderId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
         orderRepository.delete(order);
     }
 
