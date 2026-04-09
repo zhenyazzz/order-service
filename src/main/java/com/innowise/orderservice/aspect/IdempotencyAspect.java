@@ -70,17 +70,17 @@ public class IdempotencyAspect {
                 throw new RequestAlreadyProcessingException("Idempotency state is invalid. Please retry.");
             }
             
-            IdempotencyRecord record = objectMapper.readValue(saved, IdempotencyRecord.class);
+            IdempotencyRecord idempotencyRecord = objectMapper.readValue(saved, IdempotencyRecord.class);
 
-            if (!record.getRequestHash().equals(requestHash)) {
+            if (!idempotencyRecord.getRequestHash().equals(requestHash)) {
                 throw new IllegalArgumentException("Idempotency-Key reused with different request");
             }
 
-            if ("PROCESSING".equals(record.getStatus())) {
+            if ("PROCESSING".equals(idempotencyRecord.getStatus())) {
                 throw new RequestAlreadyProcessingException("Request is already processing");
             }
 
-            IdempotencyResponse resp = record.getResponse();
+            IdempotencyResponse resp = idempotencyRecord.getResponse();
 
             return ResponseEntity
                     .status(resp.getStatus())
@@ -101,14 +101,14 @@ public class IdempotencyAspect {
 
             String bodyString = objectMapper.writeValueAsString(body);
 
-            IdempotencyRecord record = IdempotencyRecord.done(
+            IdempotencyRecord idempotencyRecord = IdempotencyRecord.done(
                     requestHash,
                     new IdempotencyResponse(status, bodyString)
             );
 
             redisTemplate.opsForValue().set(
                     redisKey,
-                    objectMapper.writeValueAsString(record),
+                    objectMapper.writeValueAsString(idempotencyRecord),
                     Duration.ofMinutes(idempotent.ttlMinutes())
             );
 
