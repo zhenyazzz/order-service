@@ -2,16 +2,18 @@ package com.innowise.orderservice.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
+import com.innowise.orderservice.dto.request.OrderItemRequest;
 import com.innowise.orderservice.dto.request.UpdateOrderRequest;
+import com.innowise.orderservice.dto.request.UpdateOrderStatusRequest;
 import com.innowise.orderservice.dto.response.OrderResponse;
 import com.innowise.orderservice.model.enums.OrderStatus;
 import com.innowise.orderservice.utils.OrderTestDataFactory;
@@ -24,6 +26,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
     private static final UUID ORDER_PENDING_A = UUID.fromString("aaaaaaaa-0001-4001-8001-000000000001");
     private static final UUID ORDER_CONFIRMED_A = UUID.fromString("aaaaaaaa-0002-4002-8002-000000000002");
     private static final UUID ORDER_CANCELLED_B = UUID.fromString("aaaaaaaa-0003-4003-8003-000000000003");
+    private static final UUID ITEM_DEMO_GADGET = UUID.fromString("22222222-2222-4222-8222-222222222222");
 
     private void stubSeedUsersBatch() {
         stubInternalUsersByIds("[" + userResponseJson(USER_A, "Test", "buyer@example.com") + ","
@@ -107,17 +110,17 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Nested
-    @DisplayName("GET /orders/me/{id}")
-    class GetMyOrderById {
+    @DisplayName("GET /orders/{id}")
+    class GetOrderById {
 
         @Test
         @DisplayName("when order belongs to current user returns 200")
-        void whenPendingOrder_returns200WithUserData() {
+        void whenOwner_returns200WithUserData() {
             stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
 
             webTestClient
                     .get()
-                    .uri("/orders/me/{id}", ORDER_PENDING_A)
+                    .uri("/orders/{id}", ORDER_PENDING_A)
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
@@ -135,37 +138,38 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when order belongs to another user returns 404")
-        void whenOtherUsersOrder_returns404() {
+        @DisplayName("when order belongs to another user returns 403")
+        void whenOtherUsersOrder_returns403() {
             webTestClient
                     .get()
-                    .uri("/orders/me/{id}", ORDER_PENDING_A)
+                    .uri("/orders/{id}", ORDER_PENDING_A)
                     .header("X-User-Id", USER_B.toString())
                     .header("X-User-Email", "other@example.com")
                     .header("X-User-Roles", "ROLE_USER")
                     .exchange()
-                    .expectStatus().isNotFound();
+                    .expectStatus().isForbidden();
         }
 
         @Test
-        @DisplayName("when order is not PENDING returns 409")
-        void whenNotPending_returns409() {
+        @DisplayName("when owner reads non-PENDING order returns 200")
+        void whenConfirmedOrder_returns200() {
             stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
 
             webTestClient
                     .get()
-                    .uri("/orders/me/{id}", ORDER_CONFIRMED_A)
+                    .uri("/orders/{id}", ORDER_CONFIRMED_A)
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
                     .exchange()
-                    .expectStatus().isEqualTo(HttpStatus.CONFLICT);
+                    .expectStatus().isOk()
+                    .expectBody(OrderResponse.class)
+                    .value(response -> {
+                        assertThat(response).isNotNull();
+                        assertThat(response.id()).isEqualTo(ORDER_CONFIRMED_A);
+                        assertThat(response.status()).isEqualTo(OrderStatus.CONFIRMED);
+                    });
         }
-    }
-
-    @Nested
-    @DisplayName("GET /orders/{id}")
-    class GetOrderById {
 
         @Test
         @DisplayName("when admin requests order returns 200")
@@ -187,19 +191,6 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                         assertThat(response.user()).isNotNull();
                         assertThat(response.user().id()).isEqualTo(USER_A);
                     });
-        }
-
-        @Test
-        @DisplayName("when non-admin requests order returns 403")
-        void whenNotAdmin_returns403() {
-            webTestClient
-                    .get()
-                    .uri("/orders/{id}", ORDER_PENDING_A)
-                    .header("X-User-Id", USER_A.toString())
-                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
-                    .header("X-User-Roles", "ROLE_USER")
-                    .exchange()
-                    .expectStatus().isForbidden();
         }
     }
 
@@ -227,8 +218,10 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when non-admin requests orders returns 403")
-        void whenNotAdmin_returns403() {
+        @DisplayName("when user requests orders returns page of own orders only")
+        void whenUser_returnsOwnOrders() {
+            stubInternalUsersByIds("[" + userResponseJson(USER_A, "Test", OrderTestDataFactory.USER_EMAIL) + "]");
+
             webTestClient
                     .get()
                     .uri("/orders?page=0&size=20")
@@ -236,7 +229,11 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
                     .exchange()
-                    .expectStatus().isForbidden();
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.content").isArray()
+                    .jsonPath("$.content[0].user.id")
+                    .isEqualTo(USER_A.toString());
         }
     }
 
@@ -278,32 +275,8 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Nested
-    @DisplayName("GET /orders/me")
-    class GetMyOrders {
-
-        @Test
-        @DisplayName("when user requests own orders returns page")
-        void whenUser_returnsOwnOrders() {
-            stubInternalUsersByIds("[" + userResponseJson(USER_A, "Test", OrderTestDataFactory.USER_EMAIL) + "]");
-
-            webTestClient
-                    .get()
-                    .uri("/orders/me?page=0&size=20")
-                    .header("X-User-Id", USER_A.toString())
-                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
-                    .header("X-User-Roles", "ROLE_USER")
-                    .exchange()
-                    .expectStatus().isOk()
-                    .expectBody()
-                    .jsonPath("$.content").isArray()
-                    .jsonPath("$.content[0].user.id")
-                    .isEqualTo(USER_A.toString());
-        }
-    }
-
-    @Nested
-    @DisplayName("PUT /orders/me/{id}")
-    class UpdateMyOrder {
+    @DisplayName("PUT /orders/{id}")
+    class UpdateOrder {
 
         @Test
         @DisplayName("when PENDING order is updated returns 200")
@@ -311,14 +284,17 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
             String orderId = createOrderId(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
             stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
 
-            UpdateOrderRequest update = OrderTestDataFactory.buildUpdateOrderRequest();
+            UpdateOrderRequest update = new UpdateOrderRequest(
+                    List.of(new OrderItemRequest(ITEM_DEMO_GADGET, 3))
+            );
 
             webTestClient
                     .put()
-                    .uri("/orders/me/{id}", orderId)
+                    .uri("/orders/{id}", orderId)
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(update)
                     .exchange()
@@ -327,26 +303,30 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .value(response -> {
                         assertThat(response).isNotNull();
                         assertThat(response.id()).isEqualTo(UUID.fromString(orderId));
-                        assertThat(response.totalPrice()).isEqualByComparingTo("30.00");
+                        assertThat(response.totalPrice()).isEqualByComparingTo("76.50");
                     });
         }
     }
 
     @Nested
-    @DisplayName("POST /orders/me/{id}/cancel")
-    class CancelMyOrder {
+    @DisplayName("PATCH /orders/{id}/status")
+    class UpdateOrderStatus {
 
         @Test
-        @DisplayName("when PENDING order is cancelled returns 200")
-        void whenPending_returns200() {
+        @DisplayName("when owner cancels PENDING order returns 200")
+        void whenOwnerCancelsPending_returns200() {
             String orderId = createOrderId(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
+            stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
 
             webTestClient
-                    .post()
-                    .uri("/orders/me/{id}/cancel", UUID.fromString(orderId))
+                    .patch()
+                    .uri("/orders/{id}/status", UUID.fromString(orderId))
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
                     .expectStatus().isOk()
                     .expectBody(OrderResponse.class)
@@ -358,45 +338,32 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when cancelled twice returns 409")
-        void whenNotPending_returns409() {
+        @DisplayName("when cancel requested again on CANCELLED order returns 200 (idempotent)")
+        void whenAlreadyCancelled_patchSameStatus_returns200() {
             String orderId = createOrderId(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
+            stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
 
             webTestClient
-                    .post()
-                    .uri("/orders/me/{id}/cancel", UUID.fromString(orderId))
+                    .patch()
+                    .uri("/orders/{id}/status", UUID.fromString(orderId))
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
                     .expectStatus().isOk();
 
             webTestClient
-                    .post()
-                    .uri("/orders/me/{id}/cancel", UUID.fromString(orderId))
+                    .patch()
+                    .uri("/orders/{id}/status", UUID.fromString(orderId))
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .exchange()
-                    .expectStatus().isEqualTo(HttpStatus.CONFLICT);
-        }
-    }
-
-    @Nested
-    @DisplayName("POST /orders/{id}/cancel")
-    class CancelOrder {
-
-        @Test
-        @DisplayName("when admin cancels order returns 200")
-        void whenAdmin_returns200() {
-            String orderId = createOrderId(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
-
-            webTestClient
-                    .post()
-                    .uri("/orders/{id}/cancel", UUID.fromString(orderId))
-                    .header("X-User-Id", USER_A.toString())
-                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
-                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
                     .expectStatus().isOk()
                     .expectBody(OrderResponse.class)
@@ -408,29 +375,43 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when non-admin cancels order returns 403")
-        void whenNotAdmin_returns403() {
-            webTestClient
-                    .post()
-                    .uri("/orders/{id}/cancel", ORDER_PENDING_A)
-                    .header("X-User-Id", USER_A.toString())
-                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
-                    .header("X-User-Roles", "ROLE_USER")
-                    .exchange()
-                    .expectStatus().isForbidden();
-        }
+        @DisplayName("when admin sets CANCELLED on already cancelled order returns 200")
+        void whenAdminPatchesAlreadyCancelled_returns200() {
+            stubInternalUserById(USER_B, "Other", "other@example.com");
 
-        @Test
-        @DisplayName("when order is already cancelled returns 409")
-        void whenAlreadyCancelled_returns409() {
             webTestClient
-                    .post()
-                    .uri("/orders/{id}/cancel", ORDER_CANCELLED_B)
+                    .patch()
+                    .uri("/orders/{id}/status", ORDER_CANCELLED_B)
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
-                    .expectStatus().isEqualTo(HttpStatus.CONFLICT);
+                    .expectStatus().isOk()
+                    .expectBody(OrderResponse.class)
+                    .value(response -> {
+                        assertThat(response).isNotNull();
+                        assertThat(response.id()).isEqualTo(ORDER_CANCELLED_B);
+                        assertThat(response.status()).isEqualTo(OrderStatus.CANCELLED);
+                    });
+        }
+
+        @Test
+        @DisplayName("when non-owner user patches another user's order returns 403")
+        void whenNonOwner_returns403() {
+            webTestClient
+                    .patch()
+                    .uri("/orders/{id}/status", ORDER_PENDING_A)
+                    .header("X-User-Id", USER_B.toString())
+                    .header("X-User-Email", "other@example.com")
+                    .header("X-User-Roles", "ROLE_USER")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
+                    .exchange()
+                    .expectStatus().isForbidden();
         }
     }
 
@@ -449,6 +430,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
                     .exchange()
                     .expectStatus().isNoContent();
 

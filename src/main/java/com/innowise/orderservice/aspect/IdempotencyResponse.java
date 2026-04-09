@@ -12,5 +12,5 @@ import lombok.Setter;
 public class IdempotencyResponse {
 
     private int status;
-    private Object body;
+    private String body;
 }

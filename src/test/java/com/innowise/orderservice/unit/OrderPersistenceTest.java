@@ -3,6 +3,7 @@ package com.innowise.orderservice.unit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -162,7 +163,7 @@ class OrderPersistenceTest {
         @Test
         @DisplayName("returns true when row was updated")
         void whenUpdated_returnsTrue() {
-            when(orderRepository.updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, 0L))
+            when(orderRepository.updateStatus(OrderTestDataFactory.ORDER_ID, "CONFIRMED", 0L))
                     .thenReturn(1);
 
             boolean result = orderPersistence.updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, 0L);
@@ -173,7 +174,7 @@ class OrderPersistenceTest {
         @Test
         @DisplayName("returns false when optimistic lock prevented update")
         void whenNoRowUpdated_returnsFalse() {
-            when(orderRepository.updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, 0L))
+            when(orderRepository.updateStatus(OrderTestDataFactory.ORDER_ID, "CONFIRMED", 0L))
                     .thenReturn(0);
 
             boolean result = orderPersistence.updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, 0L);
@@ -187,23 +188,26 @@ class OrderPersistenceTest {
     class DeleteById {
 
         @Test
-        @DisplayName("loads order and deletes")
+        @DisplayName("when order exists deletes by id")
         void whenFound_deletes() {
-            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
-            when(orderRepository.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.existsById(OrderTestDataFactory.ORDER_ID)).thenReturn(true);
 
             orderPersistence.deleteById(OrderTestDataFactory.ORDER_ID);
 
-            verify(orderRepository).delete(order);
+            verify(orderRepository).existsById(OrderTestDataFactory.ORDER_ID);
+            verify(orderRepository).deleteById(OrderTestDataFactory.ORDER_ID);
         }
 
         @Test
         @DisplayName("when order not found throws OrderNotFoundException")
         void whenNotFound_throws() {
-            when(orderRepository.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(Optional.empty());
+            when(orderRepository.existsById(OrderTestDataFactory.ORDER_ID)).thenReturn(false);
 
             assertThatThrownBy(() -> orderPersistence.deleteById(OrderTestDataFactory.ORDER_ID))
                     .isInstanceOf(OrderNotFoundException.class);
+
+            verify(orderRepository).existsById(OrderTestDataFactory.ORDER_ID);
+            verify(orderRepository, never()).deleteById(any());
         }
     }
 

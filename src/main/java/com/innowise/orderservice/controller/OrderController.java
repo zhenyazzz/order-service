@@ -48,7 +48,7 @@ public class OrderController {
      * @return {@code 201 Created} with the new order body
      */
     @PostMapping
-    @Idempotent(prefix = "create-order", ttlMinutes = 30)
+    @Idempotent(ttlMinutes = 30)
     public ResponseEntity<OrderResponse> createOrder(
             @RequestBody @Valid CreateOrderRequest request) {
 
@@ -108,6 +108,7 @@ public class OrderController {
      * @param id order identifier
      */
     @PutMapping("/{id}")
+    @Idempotent(ttlMinutes = 60)
     public ResponseEntity<OrderResponse> updateOrder(
             @PathVariable UUID id,
             @RequestBody @Valid UpdateOrderRequest request) {
@@ -123,6 +124,7 @@ public class OrderController {
      * @param id order identifier
      */
     @PatchMapping("/{id}/status")
+    @Idempotent(ttlMinutes = 60)
     public ResponseEntity<OrderResponse> updateOrderStatus(
             @PathVariable UUID id,
             @RequestBody @Valid UpdateOrderStatusRequest request) {
@@ -141,6 +143,7 @@ public class OrderController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Idempotent()
     public ResponseEntity<Void> deleteOrder(@PathVariable UUID id) {
         orderService.deleteOrder(id);
         return ResponseEntity.noContent().build();

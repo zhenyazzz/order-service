@@ -11,9 +11,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.innowise.orderservice.model.Order;
-import com.innowise.orderservice.model.enums.OrderStatus;
 
 public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecificationExecutor<Order> {
 
@@ -27,14 +27,18 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);
 
     @Modifying
-    @Query("""
-        UPDATE Order o
-        SET o.status = :status,
-            o.updatedAt = CURRENT_TIMESTAMP,
-            o.version = o.version + 1
-        WHERE o.id = :id
-          AND o.version = :version
-          AND o.deleted = false
-    """)
-    int updateStatus(UUID id, OrderStatus status, Long version);
+    @Query(value = """
+        UPDATE orders
+        SET status = :status,
+            updated_at = CURRENT_TIMESTAMP,
+            version = version + 1
+        WHERE id = :id
+          AND version = :version
+          AND deleted = false
+        """, nativeQuery = true)
+    int updateStatus(
+            @Param("id") UUID id,
+            @Param("status") String status,
+            @Param("version") Long version
+    );
 }

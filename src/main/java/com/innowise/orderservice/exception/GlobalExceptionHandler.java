@@ -110,6 +110,11 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
+        return build(HttpStatus.BAD_REQUEST, "Bad request", ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String message = "Invalid value for parameter '" + ex.getName() + "'";

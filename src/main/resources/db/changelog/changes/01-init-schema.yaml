@@ -69,36 +69,36 @@ databaseChangeLog:
                   name: deleted
 
         - createTable:
-                tableName: items
-                columns:
-                  - column:
-                      name: id
-                      type: uuid
-                      constraints:
-                        primaryKey: true
-                        nullable: false
-                  - column:
-                      name: name
-                      type: varchar(255)
-                      constraints:
-                        nullable: false
-                        unique: true
-                        uniqueConstraintName: uk_items_name
-                  - column:
-                      name: price
-                      type: decimal(10,2)
-                      constraints:
-                        nullable: false
-                  - column:
-                      name: created_at
-                      type: timestamp
-                      constraints:
-                        nullable: false
-                  - column:
-                      name: updated_at
-                      type: timestamp
-                      constraints:
-                        nullable: false
+            tableName: items
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_items_name
+              - column:
+                  name: price
+                  type: decimal(10,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
 
         - createTable:
             tableName: order_items
@@ -129,7 +129,6 @@ databaseChangeLog:
                   constraints:
                     nullable: false
                     checkConstraint: "quantity > 0"
-               
               - column:
                   name: deleted
                   type: boolean
@@ -148,33 +147,33 @@ databaseChangeLog:
                     nullable: false
 
         - createIndex:
-          indexName: idx_order_items_order_id_deleted
-          tableName: order_items
-          columns:
-            - column:
-                name: order_id
-            - column:
-                name: deleted
-                
-        - createIndex:
-          indexName: idx_order_items_item_id_deleted
-          tableName: order_items
-          columns:
-            - column:
-                name: item_id
-            - column:
-                name: deleted
+            indexName: idx_order_items_order_id_deleted
+            tableName: order_items
+            columns:
+              - column:
+                  name: order_id
+              - column:
+                  name: deleted
 
         - createIndex:
-          indexName: uq_order_item_active
-          tableName: order_items
-          unique: true
-          columns:
-            - column:
-                name: order_id
-            - column:
-                name: item_id
-          where: deleted = false
+            indexName: idx_order_items_item_id_deleted
+            tableName: order_items
+            columns:
+              - column:
+                  name: item_id
+              - column:
+                  name: deleted
+
+        - createIndex:
+            indexName: uq_order_item_active
+            tableName: order_items
+            unique: true
+            columns:
+              - column:
+                  name: order_id
+              - column:
+                  name: item_id
+            where: deleted = false
     
 
 

@@ -91,20 +91,22 @@ public class OrderPersistence {
 
     @Transactional
     public boolean updateStatus(UUID id, OrderStatus status, Long version) {
-        int updated = orderRepository.updateStatus(id, status, version);
+        int updated = orderRepository.updateStatus(id, status.name(), version);
         return updated > 0;
     }
 
     @Transactional
     public void deleteById(UUID orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
-        orderRepository.delete(order);
+        if (!orderRepository.existsById(orderId)) {
+            throw new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE);
+        }
+        orderRepository.deleteById(orderId);
     }
 
     @Transactional
     public Order updateOrder(Order order, UpdateOrderRequest request) {
         order.getOrderItems().clear();
+        orderRepository.flush();
 
         List<UUID> itemIds = request.orderItems().stream()
                 .map(OrderItemRequest::itemId)
