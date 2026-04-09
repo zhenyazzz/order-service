@@ -16,6 +16,6 @@
         <appender-ref ref="CONSOLE"/>
     </root>
 
-    <logger name="com.innowise.internship.userservice" level="INFO"/>
-    <logger name="com.innowise.internship.userservice.aspect" level="DEBUG"/>
+    <logger name="com.innowise.orderservice" level="INFO"/>
+    <logger name="com.innowise.orderservice.aspect" level="DEBUG"/>
 </configuration>

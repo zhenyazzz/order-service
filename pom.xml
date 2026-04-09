@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.innowise.internship</groupId>
+    <groupId>com.innowise</groupId>
     <artifactId>order-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>order-service</name>
