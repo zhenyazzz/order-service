@@ -56,6 +56,8 @@ databaseChangeLog:
             columns:
               - column:
                   name: user_id
+              - column:
+                  name: deleted
 
         - createIndex:
             indexName: idx_orders_status
@@ -63,6 +65,8 @@ databaseChangeLog:
             columns:
               - column:
                   name: status
+              - column:
+                  name: deleted
 
         - createTable:
                 tableName: items
@@ -78,6 +82,8 @@ databaseChangeLog:
                       type: varchar(255)
                       constraints:
                         nullable: false
+                        unique: true
+                        uniqueConstraintName: uk_items_name
                   - column:
                       name: price
                       type: decimal(10,2)
@@ -122,6 +128,8 @@ databaseChangeLog:
                   type: int
                   constraints:
                     nullable: false
+                    checkConstraint: "quantity > 0"
+               
               - column:
                   name: deleted
                   type: boolean
@@ -139,6 +147,34 @@ databaseChangeLog:
                   constraints:
                     nullable: false
 
+        - createIndex:
+          indexName: idx_order_items_order_id_deleted
+          tableName: order_items
+          columns:
+            - column:
+                name: order_id
+            - column:
+                name: deleted
+                
+        - createIndex:
+          indexName: idx_order_items_item_id_deleted
+          tableName: order_items
+          columns:
+            - column:
+                name: item_id
+            - column:
+                name: deleted
+
+        - createIndex:
+          indexName: uq_order_item_active
+          tableName: order_items
+          unique: true
+          columns:
+            - column:
+                name: order_id
+            - column:
+                name: item_id
+          where: deleted = false
     
 
 
