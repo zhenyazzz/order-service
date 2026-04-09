@@ -28,8 +28,8 @@ public class SecurityConfig {
                     "/actuator/info"
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST, "/orders").authenticated()
-                .requestMatchers(HttpMethod.GET, "/orders/user/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/orders/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/orders/user/**").hasRole(ADMIN_ROLE)
+                .requestMatchers(HttpMethod.DELETE, "/orders/**").hasRole(ADMIN_ROLE)
                 .anyRequest().authenticated()
             )
             .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

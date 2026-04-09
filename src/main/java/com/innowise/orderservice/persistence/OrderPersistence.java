@@ -50,9 +50,9 @@ public class OrderPersistence {
 
     @Transactional(readOnly = true)
     public Order findByIdAndUserId(UUID id, UUID userId) {
-        Order order = orderRepository.findByIdAndUserId(id, userId)
+        return orderRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new OrderNotFoundException(ORDER_NOT_FOUND_MESSAGE));
-        return order;
+   
     }
 
     @Transactional(readOnly = true)

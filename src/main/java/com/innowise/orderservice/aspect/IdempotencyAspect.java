@@ -2,6 +2,7 @@ package com.innowise.orderservice.aspect;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
 
@@ -120,22 +121,21 @@ public class IdempotencyAspect {
     }
 
     private String buildProcessingValue(String requestHash) {
-        IdempotencyRecord record = IdempotencyRecord.processing(requestHash);
-        return objectMapper.writeValueAsString(record);
+        IdempotencyRecord idempotencyRecord = IdempotencyRecord.processing(requestHash);
+        return objectMapper.writeValueAsString(idempotencyRecord);
     }
 
     private String buildRequestHash(HttpServletRequest request) {
+        String query = request.getQueryString();
+        String raw = request.getMethod() + "\n"
+                + request.getRequestURI() + "\n"
+                + (query != null ? query : "");
         try {
-            String query = request.getQueryString();
-            String raw = request.getMethod() + "\n"
-                    + request.getRequestURI() + "\n"
-                    + (query != null ? query : "");
-
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to build request hash", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 MessageDigest not available", e);
         }
     }
 
