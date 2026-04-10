@@ -20,7 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class LoggingAspect {
 
-    @Pointcut("within(com.innowise.userservice.service..*)")
+    @Pointcut("within(com.innowise.orderservice.service..*)")
     public void serviceLayer() {}
 
     @Before("serviceLayer()")
