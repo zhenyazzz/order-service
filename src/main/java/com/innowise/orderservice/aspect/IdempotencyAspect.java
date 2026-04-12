@@ -4,7 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.List;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -14,9 +16,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.ObjectMapper;
@@ -55,7 +60,7 @@ public class IdempotencyAspect {
         
         String redisKey = REDIS_KEY_NAMESPACE + method + ":" + path + ":" + userId + ":" + idempotencyKey;
 
-        String requestHash = buildRequestHash(request);
+        String requestHash = buildRequestHash(joinPoint, request);
 
         Boolean isFirst = redisTemplate.opsForValue()
             .setIfAbsent(redisKey,
@@ -125,11 +130,26 @@ public class IdempotencyAspect {
         return objectMapper.writeValueAsString(idempotencyRecord);
     }
 
-    private String buildRequestHash(HttpServletRequest request) {
+    private String buildRequestHash(ProceedingJoinPoint joinPoint, HttpServletRequest request) {
         String query = request.getQueryString();
+        List<Object> payloadArgs = Arrays.stream(joinPoint.getArgs())
+                .filter(arg -> !(arg instanceof ServletRequest))
+                .filter(arg -> !(arg instanceof ServletResponse))
+                .filter(arg -> !(arg instanceof BindingResult))
+                .toList();
+
+        String argsCanonical;
+        try {
+            argsCanonical = objectMapper.writeValueAsString(payloadArgs);
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot serialize request arguments for idempotency hash", e);
+        }
+
         String raw = request.getMethod() + "\n"
                 + request.getRequestURI() + "\n"
-                + (query != null ? query : "");
+                + (query != null ? query : "") + "\n"
+                + argsCanonical;
+
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));

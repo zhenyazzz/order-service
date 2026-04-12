@@ -26,9 +26,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import com.innowise.orderservice.application.order.CreateOrderCommand;
-import com.innowise.orderservice.application.order.OrderCommandMapperImpl;
 import com.innowise.orderservice.application.order.UpdateOrderItemsCommand;
 import com.innowise.orderservice.dto.internal.UserResponse;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
@@ -42,6 +42,7 @@ import com.innowise.orderservice.exception.notfound.UserNotFoundException;
 import com.innowise.orderservice.exception.security.ForbiddenException;
 import com.innowise.orderservice.exception.security.SecurityContextException;
 import com.innowise.orderservice.mapper.OrderCommandMapper;
+import com.innowise.orderservice.mapper.OrderCommandMapperImpl;
 import com.innowise.orderservice.mapper.OrderMapper;
 import com.innowise.orderservice.model.Order;
 import com.innowise.orderservice.model.enums.OrderStatus;
@@ -161,6 +162,29 @@ class OrderServiceImplTest {
                         .hasMessageContaining("No access");
             }
         }
+
+        @Test
+        @DisplayName("when caller is admin may access another user's order")
+        void whenAdmin_returnsResponseForOtherUsersOrder() {
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            UserResponse user = OrderTestDataFactory.buildUserResponse();
+            OrderResponse mapped = OrderTestDataFactory.buildOrderResponse(order);
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(true);
+
+                when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+                when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
+                when(orderMapper.toResponse(order, user)).thenReturn(mapped);
+
+                OrderResponse result = orderService.getOrderById(
+                        OrderTestDataFactory.ORDER_ID,
+                        OrderTestDataFactory.OTHER_USER_ID);
+
+                assertThat(result).isEqualTo(mapped);
+                verify(userIntegrationService).getInternalUserById(OrderTestDataFactory.USER_ID);
+            }
+        }
     }
 
     @Nested
@@ -211,6 +235,50 @@ class OrderServiceImplTest {
                 when(userIntegrationService.getInternalUsersByIds(List.of(OrderTestDataFactory.USER_ID)))
                         .thenReturn(List.of(user));
                 when(orderMapper.toResponse(order, user)).thenReturn(row);
+
+                Page<OrderResponse> page = orderService.getOrders(filter, pageable, OrderTestDataFactory.USER_ID);
+
+                assertThat(page.getContent()).containsExactly(row);
+            }
+        }
+
+        @Test
+        @DisplayName("when page has no orders does not call user batch and maps rows with null user")
+        void whenEmptyPage_skipsUserBatch() {
+            OrderSearchFilterRequest filter = OrderTestDataFactory.emptyFilter();
+            Pageable pageable = PageRequest.of(0, 10);
+            Page<Order> empty = Page.empty(pageable);
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(true);
+
+                when(orderPersistence.findAll(ArgumentMatchers.<Specification<Order>>any(), eq(pageable)))
+                        .thenReturn(empty);
+
+                Page<OrderResponse> page = orderService.getOrders(filter, pageable, OrderTestDataFactory.USER_ID);
+
+                assertThat(page.getContent()).isEmpty();
+                verify(userIntegrationService, never()).getInternalUsersByIds(any());
+            }
+        }
+
+        @Test
+        @DisplayName("when batch omits a user maps that order with null user")
+        void whenUserMissingFromBatch_mapsNullUser() {
+            OrderSearchFilterRequest filter = OrderTestDataFactory.emptyFilter();
+            Pageable pageable = PageRequest.of(0, 10);
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            OrderResponse row = OrderTestDataFactory.buildOrderResponse(order, null);
+            Page<Order> entityPage = new PageImpl<>(List.of(order), pageable, 1);
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(true);
+
+                when(orderPersistence.findAll(ArgumentMatchers.<Specification<Order>>any(), eq(pageable)))
+                        .thenReturn(entityPage);
+                when(userIntegrationService.getInternalUsersByIds(List.of(OrderTestDataFactory.USER_ID)))
+                        .thenReturn(List.of());
+                when(orderMapper.toResponse(order, null)).thenReturn(row);
 
                 Page<OrderResponse> page = orderService.getOrders(filter, pageable, OrderTestDataFactory.USER_ID);
 
@@ -311,6 +379,78 @@ class OrderServiceImplTest {
         }
 
         @Test
+        @DisplayName("when caller is admin may update another user's PENDING order")
+        void whenAdmin_updatesOtherUsersOrder() {
+            UserResponse user = OrderTestDataFactory.buildUserResponse();
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            Order updatedOrder = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            OrderResponse out = OrderTestDataFactory.buildOrderResponse(updatedOrder);
+            UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(true);
+
+                when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+                when(orderPersistence.updateOrder(eq(order), any(UpdateOrderItemsCommand.class))).thenReturn(updatedOrder);
+                when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
+                when(orderMapper.toResponse(updatedOrder, user)).thenReturn(out);
+
+                OrderResponse result = orderService.updateOrder(
+                        OrderTestDataFactory.ORDER_ID,
+                        OrderTestDataFactory.OTHER_USER_ID,
+                        request);
+
+                assertThat(result).isEqualTo(out);
+                verify(orderPersistence).updateOrder(eq(order), any(UpdateOrderItemsCommand.class));
+            }
+        }
+
+        @Test
+        @DisplayName("when caller is not owner and not admin throws ForbiddenException")
+        void whenNotOwnerAndNotAdmin_throwsForbidden() {
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(false);
+
+                when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+
+                assertThatThrownBy(() -> orderService.updateOrder(
+                        OrderTestDataFactory.ORDER_ID,
+                        OrderTestDataFactory.OTHER_USER_ID,
+                        request))
+                        .isInstanceOf(ForbiddenException.class)
+                        .hasMessageContaining("No access");
+
+                verify(orderPersistence, never()).updateOrder(any(), any());
+            }
+        }
+
+        @Test
+        @DisplayName("when persistence throws ObjectOptimisticLockingFailureException propagates")
+        void whenOptimisticLockConflict_throws() {
+            UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(false);
+
+                when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+                when(orderPersistence.updateOrder(eq(order), any(UpdateOrderItemsCommand.class)))
+                        .thenThrow(new ObjectOptimisticLockingFailureException(Order.class, order.getId()));
+
+                assertThatThrownBy(() -> orderService.updateOrder(
+                        OrderTestDataFactory.ORDER_ID,
+                        OrderTestDataFactory.USER_ID,
+                        request))
+                        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+                verify(userIntegrationService, never()).getInternalUserById(any());
+            }
+        }
+
+        @Test
         @DisplayName("when security context is missing validateAccess throws before update")
         void whenSecurityContextMissing_throws() {
             UpdateOrderRequest request = OrderTestDataFactory.buildUpdateOrderRequest();
@@ -335,17 +475,17 @@ class OrderServiceImplTest {
         void whenAllowed_updatesAndReturns() {
             UserResponse user = OrderTestDataFactory.buildUserResponse();
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
-            OrderResponse out = OrderTestDataFactory.buildOrderResponse(order);
+            Order updated = OrderTestDataFactory.buildOrder(OrderStatus.CONFIRMED);
+            OrderResponse out = OrderTestDataFactory.buildOrderResponse(updated);
             UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED);
 
             try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
                 securityUtils.when(SecurityUtils::isAdmin).thenReturn(false);
 
                 when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
-                when(orderPersistence.updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, order.getVersion()))
-                        .thenReturn(true);
+                when(orderPersistence.updateStatus(order, OrderStatus.CONFIRMED)).thenReturn(updated);
                 when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
-                when(orderMapper.toResponse(order, user)).thenReturn(out);
+                when(orderMapper.toResponse(updated, user)).thenReturn(out);
 
                 OrderResponse result = orderService.updateOrderStatus(
                         OrderTestDataFactory.ORDER_ID,
@@ -353,7 +493,7 @@ class OrderServiceImplTest {
                         OrderTestDataFactory.USER_ID);
 
                 assertThat(result).isEqualTo(out);
-                verify(orderPersistence).updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, order.getVersion());
+                verify(orderPersistence).updateStatus(order, OrderStatus.CONFIRMED);
             }
         }
 
@@ -378,7 +518,78 @@ class OrderServiceImplTest {
                         OrderTestDataFactory.USER_ID);
 
                 assertThat(result).isEqualTo(out);
-                verify(orderPersistence, never()).updateStatus(any(), any(), any());
+                verify(orderPersistence, never()).updateStatus(any(Order.class), any(OrderStatus.class));
+            }
+        }
+
+        @Test
+        @DisplayName("when caller is admin may change status on another user's order")
+        void whenAdmin_updatesOtherUsersOrder() {
+            UserResponse user = OrderTestDataFactory.buildUserResponse();
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            Order updated = OrderTestDataFactory.buildOrder(OrderStatus.CONFIRMED);
+            OrderResponse out = OrderTestDataFactory.buildOrderResponse(updated);
+            UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED);
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(true);
+
+                when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+                when(orderPersistence.updateStatus(order, OrderStatus.CONFIRMED)).thenReturn(updated);
+                when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
+                when(orderMapper.toResponse(updated, user)).thenReturn(out);
+
+                OrderResponse result = orderService.updateOrderStatus(
+                        OrderTestDataFactory.ORDER_ID,
+                        request,
+                        OrderTestDataFactory.OTHER_USER_ID);
+
+                assertThat(result).isEqualTo(out);
+                verify(orderPersistence).updateStatus(order, OrderStatus.CONFIRMED);
+            }
+        }
+
+        @Test
+        @DisplayName("when caller is not owner and not admin throws ForbiddenException")
+        void whenNotOwnerAndNotAdmin_throwsForbidden() {
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED);
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(false);
+
+                when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+
+                assertThatThrownBy(() -> orderService.updateOrderStatus(
+                        OrderTestDataFactory.ORDER_ID,
+                        request,
+                        OrderTestDataFactory.OTHER_USER_ID))
+                        .isInstanceOf(ForbiddenException.class);
+
+                verify(orderPersistence, never()).updateStatus(any(Order.class), any(OrderStatus.class));
+            }
+        }
+
+        @Test
+        @DisplayName("when persistence throws ObjectOptimisticLockingFailureException propagates")
+        void whenOptimisticLockConflict_throws() {
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            UpdateOrderStatusRequest request = new UpdateOrderStatusRequest(OrderStatus.CONFIRMED);
+
+            try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+                securityUtils.when(SecurityUtils::isAdmin).thenReturn(false);
+
+                when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+                when(orderPersistence.updateStatus(order, OrderStatus.CONFIRMED))
+                        .thenThrow(new ObjectOptimisticLockingFailureException(Order.class, order.getId()));
+
+                assertThatThrownBy(() -> orderService.updateOrderStatus(
+                        OrderTestDataFactory.ORDER_ID,
+                        request,
+                        OrderTestDataFactory.USER_ID))
+                        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+                verify(userIntegrationService, never()).getInternalUserById(any());
             }
         }
 
@@ -400,7 +611,7 @@ class OrderServiceImplTest {
                         .isInstanceOf(InvalidOrderStateException.class)
                         .hasMessageContaining("Cannot change status");
 
-                verify(orderPersistence, never()).updateStatus(any(), any(), any());
+                verify(orderPersistence, never()).updateStatus(any(Order.class), any(OrderStatus.class));
             }
         }
     }

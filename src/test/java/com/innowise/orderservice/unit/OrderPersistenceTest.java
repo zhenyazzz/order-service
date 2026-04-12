@@ -164,25 +164,15 @@ class OrderPersistenceTest {
     class UpdateStatus {
 
         @Test
-        @DisplayName("returns true when row was updated")
-        void whenUpdated_returnsTrue() {
-            when(orderRepository.updateStatus(OrderTestDataFactory.ORDER_ID, "CONFIRMED", 0L))
-                    .thenReturn(1);
+        @DisplayName("sets status on entity and returns saved order")
+        void setsStatusAndSaves() {
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            when(orderRepository.save(order)).thenAnswer(invocation -> invocation.getArgument(0));
 
-            boolean result = orderPersistence.updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, 0L);
+            Order result = orderPersistence.updateStatus(order, OrderStatus.CONFIRMED);
 
-            assertThat(result).isTrue();
-        }
-
-        @Test
-        @DisplayName("returns false when optimistic lock prevented update")
-        void whenNoRowUpdated_returnsFalse() {
-            when(orderRepository.updateStatus(OrderTestDataFactory.ORDER_ID, "CONFIRMED", 0L))
-                    .thenReturn(0);
-
-            boolean result = orderPersistence.updateStatus(OrderTestDataFactory.ORDER_ID, OrderStatus.CONFIRMED, 0L);
-
-            assertThat(result).isFalse();
+            assertThat(result.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+            verify(orderRepository).save(order);
         }
     }
 

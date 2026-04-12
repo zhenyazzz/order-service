@@ -192,6 +192,28 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                         assertThat(response.user().id()).isEqualTo(USER_A);
                     });
         }
+
+        @Test
+        @DisplayName("when admin acts as another principal still reads another user's order (200)")
+        void whenAdminWithDifferentUserId_readsOtherUsersOrder_returns200() {
+            stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
+
+            webTestClient
+                    .get()
+                    .uri("/orders/{id}", ORDER_PENDING_A)
+                    .header("X-User-Id", USER_B.toString())
+                    .header("X-User-Email", "other@example.com")
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody(OrderResponse.class)
+                    .value(response -> {
+                        assertThat(response).isNotNull();
+                        assertThat(response.id()).isEqualTo(ORDER_PENDING_A);
+                        assertThat(response.user()).isNotNull();
+                        assertThat(response.user().id()).isEqualTo(USER_A);
+                    });
+        }
     }
 
     @Nested
@@ -234,6 +256,79 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .jsonPath("$.content").isArray()
                     .jsonPath("$.content[0].user.id")
                     .isEqualTo(USER_A.toString());
+        }
+
+        @Test
+        @DisplayName("when admin filters by createdFrom and createdTo returns orders in range only")
+        void whenAdmin_filtersByCreationDateRange_returnsMatchingPage() {
+            stubSeedUsersBatch();
+
+            webTestClient
+                    .get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/orders")
+                            .queryParam("page", 0)
+                            .queryParam("size", 20)
+                            .queryParam("createdFrom", "2025-03-11T00:00:00Z")
+                            .queryParam("createdTo", "2025-03-20T23:59:59Z")
+                            .build())
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements").isEqualTo(2)
+                    .jsonPath("$.content.length()").isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("when admin filters by statuses returns only matching statuses")
+        void whenAdmin_filtersByStatuses_returnsMatchingPage() {
+            stubSeedUsersBatch();
+
+            webTestClient
+                    .get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/orders")
+                            .queryParam("page", 0)
+                            .queryParam("size", 20)
+                            .queryParam("statuses", "CANCELLED")
+                            .build())
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements").isEqualTo(1)
+                    .jsonPath("$.content[0].status").isEqualTo("CANCELLED")
+                    .jsonPath("$.content[0].id").isEqualTo(ORDER_CANCELLED_B.toString());
+        }
+
+        @Test
+        @DisplayName("when admin combines date range and statuses filters apply both")
+        void whenAdmin_filtersByDateRangeAndStatuses_returnsMatchingPage() {
+            stubSeedUsersBatch();
+
+            webTestClient
+                    .get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/orders")
+                            .queryParam("page", 0)
+                            .queryParam("size", 20)
+                            .queryParam("createdFrom", "2025-03-14T00:00:00Z")
+                            .queryParam("createdTo", "2025-03-16T23:59:59Z")
+                            .queryParam("statuses", "PENDING")
+                            .build())
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements").isEqualTo(1)
+                    .jsonPath("$.content[0].id").isEqualTo(ORDER_PENDING_A.toString());
         }
     }
 
@@ -304,6 +399,58 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                         assertThat(response).isNotNull();
                         assertThat(response.id()).isEqualTo(UUID.fromString(orderId));
                         assertThat(response.totalPrice()).isEqualByComparingTo("76.50");
+                    });
+        }
+
+        @Test
+        @DisplayName("when non-owner updates another user's PENDING order returns 403")
+        void whenNonOwner_returns403() {
+            String orderId = createOrderId(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
+            stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
+
+            UpdateOrderRequest update = new UpdateOrderRequest(
+                    List.of(new OrderItemRequest(ITEM_DEMO_GADGET, 3))
+            );
+
+            webTestClient
+                    .put()
+                    .uri("/orders/{id}", orderId)
+                    .header("X-User-Id", USER_B.toString())
+                    .header("X-User-Email", "other@example.com")
+                    .header("X-User-Roles", "ROLE_USER")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(update)
+                    .exchange()
+                    .expectStatus().isForbidden();
+        }
+
+        @Test
+        @DisplayName("when admin updates another user's PENDING order returns 200")
+        void whenAdmin_updatesAnotherUsersOrder_returns200() {
+            String orderId = createOrderId(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
+            stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
+
+            UpdateOrderRequest update = new UpdateOrderRequest(
+                    List.of(new OrderItemRequest(ITEM_DEMO_GADGET, 1))
+            );
+
+            webTestClient
+                    .put()
+                    .uri("/orders/{id}", orderId)
+                    .header("X-User-Id", USER_B.toString())
+                    .header("X-User-Email", "other@example.com")
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(update)
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody(OrderResponse.class)
+                    .value(response -> {
+                        assertThat(response).isNotNull();
+                        assertThat(response.id()).isEqualTo(UUID.fromString(orderId));
+                        assertThat(response.user().id()).isEqualTo(USER_A);
                     });
         }
     }
