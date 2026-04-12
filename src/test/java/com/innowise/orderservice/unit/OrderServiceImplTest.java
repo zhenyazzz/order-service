@@ -19,6 +19,7 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -26,6 +27,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import com.innowise.orderservice.application.order.CreateOrderCommand;
+import com.innowise.orderservice.application.order.OrderCommandMapperImpl;
+import com.innowise.orderservice.application.order.UpdateOrderItemsCommand;
 import com.innowise.orderservice.dto.internal.UserResponse;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderSearchFilterRequest;
@@ -37,6 +41,7 @@ import com.innowise.orderservice.exception.notfound.OrderNotFoundException;
 import com.innowise.orderservice.exception.notfound.UserNotFoundException;
 import com.innowise.orderservice.exception.security.ForbiddenException;
 import com.innowise.orderservice.exception.security.SecurityContextException;
+import com.innowise.orderservice.mapper.OrderCommandMapper;
 import com.innowise.orderservice.mapper.OrderMapper;
 import com.innowise.orderservice.model.Order;
 import com.innowise.orderservice.model.enums.OrderStatus;
@@ -61,6 +66,9 @@ class OrderServiceImplTest {
     @Mock
     private OrderMapper orderMapper;
 
+    @Spy
+    private OrderCommandMapper orderCommandMapper = new OrderCommandMapperImpl();
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
@@ -77,13 +85,13 @@ class OrderServiceImplTest {
             Order saved = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
 
             when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
-            when(orderPersistence.saveNewOrder(user, request)).thenReturn(saved);
+            when(orderPersistence.saveNewOrder(any(CreateOrderCommand.class))).thenReturn(saved);
             when(orderMapper.toResponse(saved, user)).thenReturn(expected);
 
             OrderResponse result = orderService.createOrder(OrderTestDataFactory.USER_ID, request);
 
             assertThat(result).isEqualTo(expected);
-            verify(orderPersistence).saveNewOrder(user, request);
+            verify(orderPersistence).saveNewOrder(any(CreateOrderCommand.class));
             verify(userIntegrationService).getInternalUserById(OrderTestDataFactory.USER_ID);
             verify(orderMapper).toResponse(saved, user);
         }
@@ -100,7 +108,7 @@ class OrderServiceImplTest {
                     .isInstanceOf(UserNotFoundException.class)
                     .hasMessageContaining("User not found");
 
-            verify(orderPersistence, never()).saveNewOrder(any(), any());
+            verify(orderPersistence, never()).saveNewOrder(any(CreateOrderCommand.class));
         }
     }
 
@@ -254,14 +262,14 @@ class OrderServiceImplTest {
                 securityUtils.when(SecurityUtils::isAdmin).thenReturn(false);
 
                 when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
-                when(orderPersistence.updateOrder(order, request)).thenReturn(updatedOrder);
+                when(orderPersistence.updateOrder(eq(order), any(UpdateOrderItemsCommand.class))).thenReturn(updatedOrder);
                 when(userIntegrationService.getInternalUserById(OrderTestDataFactory.USER_ID)).thenReturn(user);
                 when(orderMapper.toResponse(updatedOrder, user)).thenReturn(out);
 
                 OrderResponse result = orderService.updateOrder(OrderTestDataFactory.ORDER_ID, OrderTestDataFactory.USER_ID, request);
 
                 assertThat(result).isEqualTo(out);
-                verify(orderPersistence).updateOrder(order, request);
+                verify(orderPersistence).updateOrder(eq(order), any(UpdateOrderItemsCommand.class));
                 verify(userIntegrationService).getInternalUserById(OrderTestDataFactory.USER_ID);
             }
         }

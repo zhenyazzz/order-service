@@ -77,6 +77,7 @@ public class OrderTestDataFactory {
                 order.getTotalPrice(),
                 List.of(),
                 order.getCreatedAt(),
+                order.getUpdatedAt(),
                 user
         );
     }
@@ -92,6 +93,7 @@ public class OrderTestDataFactory {
                 o.getTotalPrice(),
                 List.of(line),
                 o.getCreatedAt(),
+                o.getUpdatedAt(),
                 user
         );
     }

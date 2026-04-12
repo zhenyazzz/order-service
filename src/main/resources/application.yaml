@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: ${SERVER_PORT:8083}
 
 user-service:
   url: ${USER_SERVICE_URL:http://localhost:8082}

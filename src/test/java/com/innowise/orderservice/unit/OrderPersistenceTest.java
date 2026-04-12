@@ -25,6 +25,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import com.innowise.orderservice.application.order.CreateOrderCommand;
+import com.innowise.orderservice.application.order.OrderItemCommand;
+import com.innowise.orderservice.application.order.UpdateOrderItemsCommand;
 import com.innowise.orderservice.dto.internal.UserResponse;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderItemRequest;
@@ -226,10 +229,10 @@ class OrderPersistenceTest {
             Order order = new Order();
 
             when(itemRepository.findAllById(any())).thenReturn(List.of(item));
-            when(orderItemMapper.toEntity(any(), any())).thenReturn(new OrderItem());
+            when(orderItemMapper.toEntity(any(OrderItemCommand.class), any(Item.class))).thenReturn(new OrderItem());
             when(orderMapper.toEntity(any(UUID.class), any())).thenReturn(order);
 
-            Order result = orderPersistence.saveNewOrder(userResponse, request);
+            Order result = orderPersistence.saveNewOrder(createOrderCommand(userResponse, request));
 
             assertThat(result).isEqualTo(order);
             verify(orderRepository).save(order);
@@ -243,7 +246,7 @@ class OrderPersistenceTest {
 
             when(itemRepository.findAllById(any())).thenReturn(List.of());
 
-            assertThatThrownBy(() -> orderPersistence.saveNewOrder(userResponse, request))
+            assertThatThrownBy(() -> orderPersistence.saveNewOrder(createOrderCommand(userResponse, request)))
                     .isInstanceOf(ItemNotFoundException.class)
                     .hasMessageContaining(OrderTestDataFactory.ITEM_ID.toString());
         }
@@ -263,7 +266,7 @@ class OrderPersistenceTest {
             item.setPrice(BigDecimal.valueOf(25.50));
 
             when(itemRepository.findAllById(any())).thenReturn(List.of(item));
-            when(orderItemMapper.toEntity(any(), any())).thenAnswer(inv -> {
+            when(orderItemMapper.toEntity(any(OrderItemCommand.class), any(Item.class))).thenAnswer(inv -> {
                 OrderItem oi = new OrderItem();
                 oi.setItem(item);
                 oi.setQuantity(2);
@@ -271,7 +274,7 @@ class OrderPersistenceTest {
             });
             when(orderRepository.save(order)).thenReturn(order);
 
-            Order result = orderPersistence.updateOrder(order, request);
+            Order result = orderPersistence.updateOrder(order, updateLinesCommand(request));
 
             assertThat(result.getTotalPrice()).isEqualByComparingTo(BigDecimal.valueOf(51.00));
             verify(orderRepository).save(order);
@@ -285,7 +288,7 @@ class OrderPersistenceTest {
 
             when(itemRepository.findAllById(any())).thenReturn(List.of());
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(order, request))
+            assertThatThrownBy(() -> orderPersistence.updateOrder(order, updateLinesCommand(request)))
                     .isInstanceOf(ItemNotFoundException.class)
                     .hasMessageContaining(OrderTestDataFactory.ITEM_ID.toString());
         }
@@ -298,7 +301,7 @@ class OrderPersistenceTest {
 
             when(itemRepository.findAllById(any())).thenReturn(List.of());
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(order, request))
+            assertThatThrownBy(() -> orderPersistence.updateOrder(order, updateLinesCommand(request)))
                     .isInstanceOf(InvalidOrderStateException.class)
                     .hasMessageContaining("at least one item");
         }
@@ -317,16 +320,31 @@ class OrderPersistenceTest {
             only.setId(OrderTestDataFactory.ITEM_ID);
             only.setPrice(BigDecimal.ONE);
             when(itemRepository.findAllById(any())).thenReturn(List.of(only));
-            when(orderItemMapper.toEntity(any(), any())).thenAnswer(inv -> {
+            when(orderItemMapper.toEntity(any(OrderItemCommand.class), any(Item.class))).thenAnswer(inv -> {
                 OrderItem oi = new OrderItem();
                 oi.setItem(inv.getArgument(1));
-                oi.setQuantity(((OrderItemRequest) inv.getArgument(0)).quantity());
+                oi.setQuantity(inv.getArgument(0, OrderItemCommand.class).quantity());
                 return oi;
             });
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(order, request))
+            assertThatThrownBy(() -> orderPersistence.updateOrder(order, updateLinesCommand(request)))
                     .isInstanceOf(ItemNotFoundException.class)
                     .hasMessageContaining(otherId.toString());
         }
+    }
+
+    private static CreateOrderCommand createOrderCommand(UserResponse user, CreateOrderRequest request) {
+        return new CreateOrderCommand(
+                user.id(),
+                request.orderItems().stream()
+                        .map(oi -> new OrderItemCommand(oi.itemId(), oi.quantity()))
+                        .toList());
+    }
+
+    private static UpdateOrderItemsCommand updateLinesCommand(UpdateOrderRequest request) {
+        return new UpdateOrderItemsCommand(
+                request.orderItems().stream()
+                        .map(oi -> new OrderItemCommand(oi.itemId(), oi.quantity()))
+                        .toList());
     }
 }
