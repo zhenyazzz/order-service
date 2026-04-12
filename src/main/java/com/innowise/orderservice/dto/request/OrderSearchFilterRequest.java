@@ -6,6 +6,8 @@ import com.innowise.orderservice.validation.annotation.ValidDateRange;
 import java.time.Instant;
 import java.util.List;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 
 @ValidDateRange
@@ -14,6 +16,7 @@ public record OrderSearchFilterRequest(
         Instant createdFrom,
         @PastOrPresent(message = "Created to date must be in the past or present")
         Instant createdTo,
-        List<OrderStatus> statuses
+        @Valid
+        List<@NotNull(message = "Status must not be null") OrderStatus> statuses
 ) {
 }

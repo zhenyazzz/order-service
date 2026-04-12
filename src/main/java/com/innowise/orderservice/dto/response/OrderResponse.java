@@ -14,6 +14,7 @@ public record OrderResponse(
         BigDecimal totalPrice,
         List<OrderItemResponse> orderItems,
         Instant createdAt,
+        Instant updatedAt,
         UserResponse user
 ) {
 }

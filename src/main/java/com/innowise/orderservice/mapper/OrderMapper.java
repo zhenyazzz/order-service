@@ -4,6 +4,7 @@ import com.innowise.orderservice.dto.internal.UserResponse;
 import com.innowise.orderservice.dto.response.OrderResponse;
 import com.innowise.orderservice.model.Order;
 import com.innowise.orderservice.model.OrderItem;
+import com.innowise.orderservice.model.enums.OrderStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,7 +15,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = "spring", uses = OrderItemMapper.class)
+@Mapper(componentModel = "spring", uses = OrderItemMapper.class, imports = OrderStatus.class)
 public interface OrderMapper {
 
     @Mapping(target = "id", ignore = true)
@@ -31,6 +32,7 @@ public interface OrderMapper {
     @Mapping(target = "totalPrice", source = "order.totalPrice")
     @Mapping(target = "orderItems", source = "order.orderItems")
     @Mapping(target = "createdAt", source = "order.createdAt")
+    @Mapping(target = "updatedAt", source = "order.updatedAt")
     @Mapping(target = "user", source = "user")
     OrderResponse toResponse(Order order, UserResponse user);
 
