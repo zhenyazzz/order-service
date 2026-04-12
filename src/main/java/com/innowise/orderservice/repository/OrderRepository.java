@@ -26,19 +26,4 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     @EntityGraph(value = "order-with-items", type = EntityGraph.EntityGraphType.LOAD)
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);
 
-    @Modifying
-    @Query(value = """
-        UPDATE orders
-        SET status = :status,
-            updated_at = CURRENT_TIMESTAMP,
-            version = version + 1
-        WHERE id = :id
-          AND version = :version
-          AND deleted = false
-        """, nativeQuery = true)
-    int updateStatus(
-            @Param("id") UUID id,
-            @Param("status") String status,
-            @Param("version") Long version
-    );
 }

@@ -6,6 +6,7 @@ import java.util.Map;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -41,56 +42,71 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    private static ResponseEntity<ProblemDetail> toResponse(HttpStatus status, ProblemDetail body) {
+        return ResponseEntity.status(status).body(body);
+    }
+
     @ExceptionHandler(RequestAlreadyProcessingException.class)
-    public ProblemDetail handleRequestAlreadyProcessing(RequestAlreadyProcessingException ex) {
-        return build(HttpStatus.CONFLICT, "Request already processing", ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleRequestAlreadyProcessing(RequestAlreadyProcessingException ex) {
+        HttpStatus status = HttpStatus.CONFLICT;
+        return toResponse(status, build(status, "Request already processing", ex.getMessage()));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ProblemDetail handleNotFoundExceptions(ResourceNotFoundException ex) {
-        return build(HttpStatus.NOT_FOUND, "Resource not found", ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleNotFoundExceptions(ResourceNotFoundException ex) {
+        HttpStatus status = HttpStatus.NOT_FOUND;
+        return toResponse(status, build(status, "Resource not found", ex.getMessage()));
     }
 
     @ExceptionHandler(SecurityContextException.class)
-    public ProblemDetail handleSecurityContextException(SecurityContextException ex) {
-        return build(HttpStatus.UNAUTHORIZED, "Authentication error", ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleSecurityContextException(SecurityContextException ex) {
+        HttpStatus status = HttpStatus.UNAUTHORIZED;
+        return toResponse(status, build(status, "Authentication error", ex.getMessage()));
     }
 
     @ExceptionHandler({ForbiddenException.class, AuthorizationDeniedException.class})
-    public ProblemDetail handleForbidden(RuntimeException ex) {
+    public ResponseEntity<ProblemDetail> handleForbidden(RuntimeException ex) {
+        HttpStatus status = HttpStatus.FORBIDDEN;
         if (ex instanceof ForbiddenException fe) {
-            return build(HttpStatus.FORBIDDEN, "Forbidden", fe.getMessage());
+            return toResponse(status, build(status, "Forbidden", fe.getMessage()));
         }
-        return build(HttpStatus.FORBIDDEN, "Forbidden", "Access denied");
+        return toResponse(status, build(status, "Forbidden", "Access denied"));
     }
 
     @ExceptionHandler(InvalidOrderStateException.class)
-    public ProblemDetail handleInvalidOrderStateException(InvalidOrderStateException ex) {
-        return build(HttpStatus.CONFLICT, "Invalid order state", ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleInvalidOrderStateException(InvalidOrderStateException ex) {
+        HttpStatus status = HttpStatus.CONFLICT;
+        return toResponse(status, build(status, "Invalid order state", ex.getMessage()));
     }
 
     @ExceptionHandler(OrderAlreadyCancelledException.class)
-    public ProblemDetail handleOrderAlreadyCancelled(OrderAlreadyCancelledException ex) {
-        return build(HttpStatus.CONFLICT, "Order already cancelled", ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleOrderAlreadyCancelled(OrderAlreadyCancelledException ex) {
+        HttpStatus status = HttpStatus.CONFLICT;
+        return toResponse(status, build(status, "Order already cancelled", ex.getMessage()));
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+    public ResponseEntity<ProblemDetail> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
         log.warn("Optimistic lock failure", ex);
-        return build(
-                HttpStatus.CONFLICT,
-                "Concurrent modification",
-                "Resource was modified concurrently. Please reload and retry."
+        HttpStatus status = HttpStatus.CONFLICT;
+        return toResponse(
+                status,
+                build(
+                        status,
+                        "Concurrent modification",
+                        "Resource was modified concurrently. Please reload and retry."
+                )
         );
     }
 
     @ExceptionHandler(UserServiceUnavailableException.class)
-    public ProblemDetail handleUserServiceUnavailable(UserServiceUnavailableException ex) {
-        return build(HttpStatus.SERVICE_UNAVAILABLE, "User service unavailable", ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleUserServiceUnavailable(UserServiceUnavailableException ex) {
+        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+        return toResponse(status, build(status, "User service unavailable", ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ProblemDetail> handleValidation(MethodArgumentNotValidException ex) {
         String traceId = MDC.get(TRACE_ID_KEY);
         log.warn("Validation error [traceId={}]: {}", traceId, ex.getMessage());
 
@@ -101,22 +117,24 @@ public class GlobalExceptionHandler {
                 ))
                 .toList();
 
+        HttpStatus status = HttpStatus.BAD_REQUEST;
         ProblemDetail pd = build(
-                HttpStatus.BAD_REQUEST,
+                status,
                 "Validation failed",
                 "Request validation failed"
         );
         pd.setProperty("violations", violations);
-        return pd;
+        return toResponse(status, pd);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
-        return build(HttpStatus.BAD_REQUEST, "Bad request", ex.getMessage());
+    public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        return toResponse(status, build(status, "Bad request", ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+    public ResponseEntity<ProblemDetail> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String message = "Invalid value for parameter '" + ex.getName() + "'";
         if (ex.getRequiredType() != null) {
             message += ": expected " + ex.getRequiredType().getSimpleName();
@@ -125,19 +143,24 @@ public class GlobalExceptionHandler {
             message += ", got '" + ex.getValue() + "'";
         }
 
-        return build(HttpStatus.BAD_REQUEST, "Bad request", message);
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        return toResponse(status, build(status, "Bad request", message));
     }
 
     @ExceptionHandler(Exception.class)
-    public ProblemDetail handleAllUncaughtException(Exception ex) {
+    public ResponseEntity<ProblemDetail> handleAllUncaughtException(Exception ex) {
         String traceId = MDC.get(TRACE_ID_KEY);
 
         log.error("Unknown error occurred [traceId={}]", traceId, ex);
 
-        return build(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "Internal server error",
-                "An unexpected server error occurred"
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        return toResponse(
+                status,
+                build(
+                        status,
+                        "Internal server error",
+                        "An unexpected server error occurred"
+                )
         );
     }
 }

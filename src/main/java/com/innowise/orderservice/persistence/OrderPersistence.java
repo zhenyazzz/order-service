@@ -13,10 +13,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.innowise.orderservice.dto.internal.UserResponse;
-import com.innowise.orderservice.dto.request.CreateOrderRequest;
-import com.innowise.orderservice.dto.request.OrderItemRequest;
-import com.innowise.orderservice.dto.request.UpdateOrderRequest;
+import com.innowise.orderservice.application.order.CreateOrderCommand;
+import com.innowise.orderservice.application.order.OrderItemCommand;
+import com.innowise.orderservice.application.order.UpdateOrderItemsCommand;
 import com.innowise.orderservice.exception.conflict.InvalidOrderStateException;
 import com.innowise.orderservice.exception.notfound.ItemNotFoundException;
 import com.innowise.orderservice.exception.notfound.OrderNotFoundException;
@@ -61,25 +60,25 @@ public class OrderPersistence {
     }
 
     @Transactional
-    public Order saveNewOrder(UserResponse userResponse, CreateOrderRequest request) {
-        List<OrderItemRequest> orderItemRequests = request.orderItems();
-        List<UUID> itemIds = orderItemRequests.stream()
-                .map(OrderItemRequest::itemId)
+    public Order saveNewOrder(CreateOrderCommand command) {
+        List<OrderItemCommand> items = command.orderItems();
+        List<UUID> itemIds = items.stream()
+                .map(OrderItemCommand::itemId)
                 .distinct()
                 .toList();
         Map<UUID, Item> itemsById = itemRepository.findAllById(itemIds).stream()
                 .collect(Collectors.toMap(Item::getId, Function.identity()));
 
-        List<OrderItem> orderItems = orderItemRequests.stream()
-                .map(orderItemRequest -> {
-                    Item item = itemsById.get(orderItemRequest.itemId());
+        List<OrderItem> orderItems = items.stream()
+                .map(line -> {
+                    Item item = itemsById.get(line.itemId());
                     if (item == null) {
-                        throw new ItemNotFoundException("Item not found: " + orderItemRequest.itemId());
+                        throw new ItemNotFoundException("Item not found: " + line.itemId());
                     }
-                    return orderItemMapper.toEntity(orderItemRequest, item);
+                    return orderItemMapper.toEntity(line, item);
                 })
                 .toList();
-        Order order = orderMapper.toEntity(userResponse.id(), orderItems);
+        Order order = orderMapper.toEntity(command.userId(), orderItems);
         orderRepository.save(order);
         return order;
     }
@@ -90,9 +89,9 @@ public class OrderPersistence {
     }
 
     @Transactional
-    public boolean updateStatus(UUID id, OrderStatus status, Long version) {
-        int updated = orderRepository.updateStatus(id, status.name(), version);
-        return updated > 0;
+    public Order updateStatus(Order order, OrderStatus status) {
+        order.setStatus(status);
+        return orderRepository.save(order);
     }
 
     @Transactional
@@ -104,24 +103,25 @@ public class OrderPersistence {
     }
 
     @Transactional
-    public Order updateOrder(Order order, UpdateOrderRequest request) {
+    public Order updateOrder(Order order, UpdateOrderItemsCommand command) {
         order.getOrderItems().clear();
         orderRepository.flush();
 
-        List<UUID> itemIds = request.orderItems().stream()
-                .map(OrderItemRequest::itemId)
+        List<OrderItemCommand> items = command.orderItems();
+        List<UUID> itemIds = items.stream()
+                .map(OrderItemCommand::itemId)
                 .distinct()
                 .toList();
         Map<UUID, Item> itemsById = itemRepository.findAllById(itemIds).stream()
                 .collect(Collectors.toMap(Item::getId, Function.identity()));
 
-        List<OrderItem> newOrderItems = request.orderItems().stream()
-                .map(orderItemRequest -> {
-                    Item item = itemsById.get(orderItemRequest.itemId());
+        List<OrderItem> newOrderItems = items.stream()
+                .map(line -> {
+                    Item item = itemsById.get(line.itemId());
                     if (item == null) {
-                        throw new ItemNotFoundException("Item not found: " + orderItemRequest.itemId());
+                        throw new ItemNotFoundException("Item not found: " + line.itemId());
                     }
-                    OrderItem orderItem = orderItemMapper.toEntity(orderItemRequest, item);
+                    OrderItem orderItem = orderItemMapper.toEntity(line, item);
                     order.addOrderItem(orderItem);
                     return orderItem;
                 })

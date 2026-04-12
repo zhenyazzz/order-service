@@ -7,10 +7,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
 import com.innowise.orderservice.dto.internal.UserResponse;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderSearchFilterRequest;
@@ -22,6 +22,7 @@ import com.innowise.orderservice.service.OrderService;
 import com.innowise.orderservice.client.UserIntegrationService;
 import com.innowise.orderservice.exception.conflict.InvalidOrderStateException;
 import com.innowise.orderservice.exception.security.ForbiddenException;
+import com.innowise.orderservice.mapper.OrderCommandMapper;
 import com.innowise.orderservice.mapper.OrderMapper;
 import com.innowise.orderservice.model.Order;
 import com.innowise.orderservice.model.enums.OrderStatus;
@@ -44,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderPersistence orderPersistence;
     private final UserIntegrationService userIntegrationService;
     private final OrderMapper orderMapper;
+    private final OrderCommandMapper orderCommandMapper;
 
     /**
      * {@inheritDoc}
@@ -51,7 +53,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request) {
         UserResponse user = userIntegrationService.getInternalUserById(userId);
-        Order order = orderPersistence.saveNewOrder(user, request);
+        Order order = orderPersistence.saveNewOrder(orderCommandMapper.toCreateCommand(user.id(), request));
         return orderMapper.toResponse(order, user);
     }
 
@@ -113,7 +115,7 @@ public class OrderServiceImpl implements OrderService {
                     "Only PENDING orders can be updated; current status: " + order.getStatus());
         }
 
-        Order updated = orderPersistence.updateOrder(order, request);
+        Order updated = orderPersistence.updateOrder(order, orderCommandMapper.toUpdateItemsCommand(request));
 
         return toResponseWithUser(updated);
     }
@@ -144,15 +146,9 @@ public class OrderServiceImpl implements OrderService {
             );
         }
 
-        boolean updated = orderPersistence.updateStatus(orderId, target, order.getVersion());
+        Order updated = orderPersistence.updateStatus(order, target);
 
-        if (!updated) {
-            throw new ObjectOptimisticLockingFailureException(Order.class, orderId);
-        }
-
-        order.setStatus(target); 
-
-        return toResponseWithUser(order);
+        return toResponseWithUser(updated);
     }
 
     /**
@@ -183,7 +179,7 @@ public class OrderServiceImpl implements OrderService {
             Pageable pageable,
             UUID userId
     ) {
-        Specification<Order> spec = OrderSpecification.byFilter(filter);
+        Specification<Order> spec = OrderSpecification.byCriteria(orderCommandMapper.toSearchCriteria(filter));
 
         if (userId != null) {
             spec = spec.and(OrderSpecification.hasUserId(userId));

@@ -40,7 +40,14 @@ public class UserIntegrationService {
     @CircuitBreaker(name = "user-service")
     @Retry(name = "user-service", fallbackMethod = "getInternalUsersByIdsFallback")
     public List<UserResponse> getInternalUsersByIds(List<UUID> ids) {
-        return userServiceClient.getInternalUsersByIds(ids);
+        try {
+            return userServiceClient.getInternalUsersByIds(ids);
+        } catch (FeignException e) {
+            if (e.status() == 404) {
+                throw new UserNotFoundException("Users not found for ids: " + ids);
+            }
+            throw e;
+        }
     }
 
     private UserResponse getInternalUserByIdFallback(UUID id, Throwable throwable) {
@@ -60,7 +67,15 @@ public class UserIntegrationService {
     }
 
     private List<UserResponse> getInternalUsersByIdsFallback(List<UUID> ids, Throwable throwable) {
-        log.warn("User service batch call failed, falling back: {}", throwable.toString());
+        if (throwable instanceof UserNotFoundException userNotFoundException) {
+            throw userNotFoundException;
+        }
+
+        if (throwable instanceof feign.FeignException feignException && feignException.status() == 404) {
+            throw new UserNotFoundException("Users not found for ids: " + ids);
+        }
+
+        log.warn("User service batch call failed for ids={}, falling back: {}", ids, throwable.toString());
         throw new UserServiceUnavailableException(
                 "User service is unavailable. Please retry later.",
                 throwable

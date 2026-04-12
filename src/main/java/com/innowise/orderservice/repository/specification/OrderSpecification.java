@@ -1,7 +1,7 @@
 package com.innowise.orderservice.repository.specification;
 
-import com.innowise.orderservice.dto.request.OrderSearchFilterRequest;
 import com.innowise.orderservice.model.Order;
+import com.innowise.orderservice.model.criteria.OrderSearchCriteria;
 import com.innowise.orderservice.model.enums.OrderStatus;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -41,11 +41,11 @@ public final class OrderSpecification {
                 (statuses == null || statuses.isEmpty()) ? cb.conjunction() : root.get("status").in(statuses);
     }
 
-    public static Specification<Order> byFilter(OrderSearchFilterRequest filter) {
-        if (filter == null) {
+    public static Specification<Order> byCriteria(OrderSearchCriteria criteria) {
+        if (criteria == null) {
             return (root, query, cb) -> cb.conjunction();
         }
-        return Specification.where(createdAtBetween(filter.createdFrom(), filter.createdTo()))
-                .and(hasStatuses(filter.statuses()));
+        return Specification.where(createdAtBetween(criteria.createdFrom(), criteria.createdTo()))
+                .and(hasStatuses(criteria.statuses()));
     }
 }
