@@ -236,7 +236,8 @@ class OrderPersistenceTest {
 
             when(itemRepository.findAllById(any())).thenReturn(List.of());
 
-            assertThatThrownBy(() -> orderPersistence.saveNewOrder(createOrderCommand(userResponse, request)))
+            CreateOrderCommand command = createOrderCommand(userResponse, request);
+            assertThatThrownBy(() -> orderPersistence.saveNewOrder(command))
                     .isInstanceOf(ItemNotFoundException.class)
                     .hasMessageContaining(OrderTestDataFactory.ITEM_ID.toString());
         }
@@ -278,7 +279,8 @@ class OrderPersistenceTest {
 
             when(itemRepository.findAllById(any())).thenReturn(List.of());
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(order, updateLinesCommand(request)))
+            UpdateOrderItemsCommand command = updateLinesCommand(request);
+            assertThatThrownBy(() -> orderPersistence.updateOrder(order, command))
                     .isInstanceOf(ItemNotFoundException.class)
                     .hasMessageContaining(OrderTestDataFactory.ITEM_ID.toString());
         }
@@ -291,7 +293,8 @@ class OrderPersistenceTest {
 
             when(itemRepository.findAllById(any())).thenReturn(List.of());
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(order, updateLinesCommand(request)))
+            UpdateOrderItemsCommand command = updateLinesCommand(request);
+            assertThatThrownBy(() -> orderPersistence.updateOrder(order, command))
                     .isInstanceOf(InvalidOrderStateException.class)
                     .hasMessageContaining("at least one item");
         }
@@ -317,7 +320,8 @@ class OrderPersistenceTest {
                 return oi;
             });
 
-            assertThatThrownBy(() -> orderPersistence.updateOrder(order, updateLinesCommand(request)))
+            UpdateOrderItemsCommand command = updateLinesCommand(request);
+            assertThatThrownBy(() -> orderPersistence.updateOrder(order, command))
                     .isInstanceOf(ItemNotFoundException.class)
                     .hasMessageContaining(otherId.toString());
         }

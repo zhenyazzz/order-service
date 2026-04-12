@@ -103,6 +103,14 @@ public class OrderPersistence {
     }
 
     @Transactional
+    public void deleteAllByUserId(UUID userId) {
+        List<Order> orders = orderRepository.findAllByUserId(userId);
+        for (Order order : orders) {
+            orderRepository.delete(order);
+        }
+    }
+
+    @Transactional
     public Order updateOrder(Order order, UpdateOrderItemsCommand command) {
         order.getOrderItems().clear();
         orderRepository.flush();

@@ -26,6 +26,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
     private static final UUID ORDER_PENDING_A = UUID.fromString("aaaaaaaa-0001-4001-8001-000000000001");
     private static final UUID ORDER_CONFIRMED_A = UUID.fromString("aaaaaaaa-0002-4002-8002-000000000002");
     private static final UUID ORDER_CANCELLED_B = UUID.fromString("aaaaaaaa-0003-4003-8003-000000000003");
+    private static final UUID USER_C_NO_SEED = UUID.fromString("cccccccc-cccc-4ccc-8ccc-ccccccccccc1");
     private static final UUID ITEM_DEMO_GADGET = UUID.fromString("22222222-2222-4222-8222-222222222222");
 
     private void stubSeedUsersBatch() {
@@ -591,6 +592,82 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Roles", "ROLE_ADMIN")
                     .exchange()
                     .expectStatus().isNotFound();
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /orders/user/{userId}")
+    class DeleteOrdersByUserId {
+
+        @Test
+        @DisplayName("when admin deletes all orders for user returns 204 and list is empty")
+        void whenAdmin_deletesAllForUser_returns204_andListEmpty() {
+            createOrder(USER_C_NO_SEED, "NoSeed", "noseed@example.com", UUID.randomUUID().toString());
+            createOrder(USER_C_NO_SEED, "NoSeed", "noseed@example.com", UUID.randomUUID().toString());
+
+            stubInternalUsersByIds("[" + userResponseJson(USER_C_NO_SEED, "NoSeed", "noseed@example.com") + "]");
+
+            webTestClient
+                    .get()
+                    .uri("/orders/user/{userId}?page=0&size=20", USER_C_NO_SEED)
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements").isEqualTo(2);
+
+            webTestClient
+                    .delete()
+                    .uri("/orders/user/{userId}", USER_C_NO_SEED)
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .exchange()
+                    .expectStatus().isNoContent();
+
+            stubInternalUsersByIds("[" + userResponseJson(USER_C_NO_SEED, "NoSeed", "noseed@example.com") + "]");
+
+            webTestClient
+                    .get()
+                    .uri("/orders/user/{userId}?page=0&size=20", USER_C_NO_SEED)
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements").isEqualTo(0)
+                    .jsonPath("$.content.length()").isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("when non-admin deletes by user returns 403")
+        void whenNotAdmin_returns403() {
+            webTestClient
+                    .delete()
+                    .uri("/orders/user/{userId}", USER_B)
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_USER")
+                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .exchange()
+                    .expectStatus().isForbidden();
+        }
+
+        @Test
+        @DisplayName("when Idempotency-Key is missing returns 400")
+        void whenIdempotencyKeyMissing_returns400() {
+            webTestClient
+                    .delete()
+                    .uri("/orders/user/{userId}", USER_B)
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_ADMIN")
+                    .exchange()
+                    .expectStatus().isBadRequest();
         }
     }
 }

@@ -30,11 +30,15 @@
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.organization>zhenyazzz</sonar.organization>
         <sonar.projectKey>zhenyazzz_order-service</sonar.projectKey>
+        <!-- Keep in sync with jacoco-maven-plugin <excludes> below (Sonar does not read sonar.* for JaCoCo). -->
         <sonar.coverage.exclusions>
             **/config/**,
             **/exception/**,
             **/error/**,
-            **/mapper/*Impl.java
+            **/mapper/*Impl.java,
+            **/application/**,
+            **/aspect/**,
+            **/client/**
         </sonar.coverage.exclusions>
         <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
@@ -241,6 +245,17 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>com/innowise/orderservice/config/**</exclude>
+                                <exclude>com/innowise/orderservice/exception/**</exclude>
+                                <exclude>com/innowise/orderservice/dto/error/**</exclude>
+                                <exclude>com/innowise/orderservice/mapper/*Impl</exclude>
+                                <exclude>com/innowise/orderservice/application/**</exclude>
+                                <exclude>com/innowise/orderservice/aspect/**</exclude>
+                                <exclude>com/innowise/orderservice/client/**</exclude>
+                            </excludes>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

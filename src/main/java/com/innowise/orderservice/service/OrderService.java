@@ -94,4 +94,11 @@ public interface OrderService {
      * @param orderId order to remove
      */
     void deleteOrder(UUID orderId);
+
+    /**
+     * Removes all orders owned by the given user. Intended for administrative flows (e.g. account deletion).
+     *
+     * @param userId user whose orders are removed
+     */
+    void deleteOrdersForUser(UUID userId);
 }

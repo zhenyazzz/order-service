@@ -640,4 +640,17 @@ class OrderServiceImplTest {
             verify(orderPersistence).deleteById(OrderTestDataFactory.ORDER_ID);
         }
     }
+
+    @Nested
+    @DisplayName("deleteOrdersForUser")
+    class DeleteOrdersForUser {
+
+        @Test
+        @DisplayName("delegates to persistence")
+        void delegates() {
+            orderService.deleteOrdersForUser(OrderTestDataFactory.USER_ID);
+
+            verify(orderPersistence).deleteAllByUserId(OrderTestDataFactory.USER_ID);
+        }
+    }
 }

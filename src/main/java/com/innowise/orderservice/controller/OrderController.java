@@ -103,6 +103,19 @@ public class OrderController {
     }
 
     /**
+     * Deletes all orders for a given user. Restricted to administrators.
+     *
+     * @param userId owner whose orders are removed
+     */
+    @DeleteMapping("/user/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Idempotent()
+    public ResponseEntity<Void> deleteOrdersByUserId(@PathVariable UUID userId) {
+        orderService.deleteOrdersForUser(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * Full update of order content (e.g. line items) for an existing order.
      *
      * @param id order identifier

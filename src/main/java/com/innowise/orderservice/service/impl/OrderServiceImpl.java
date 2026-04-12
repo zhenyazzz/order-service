@@ -159,6 +159,13 @@ public class OrderServiceImpl implements OrderService {
         orderPersistence.deleteById(orderId);
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void deleteOrdersForUser(UUID userId) {
+        orderPersistence.deleteAllByUserId(userId);
+    }
 
     private void validateAccess(Order order, UUID currentUserId) {
         boolean isOwner = order.getUserId().equals(currentUserId);
