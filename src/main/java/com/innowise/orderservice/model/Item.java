@@ -14,6 +14,8 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.annotations.SoftDelete;
+import org.hibernate.annotations.SoftDeleteType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,6 +27,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
+@SoftDelete(columnName = "deleted", strategy = SoftDeleteType.DELETED)
 public class Item {
 
     @Id

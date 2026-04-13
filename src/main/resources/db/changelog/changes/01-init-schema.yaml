@@ -82,11 +82,15 @@ databaseChangeLog:
                   type: varchar(255)
                   constraints:
                     nullable: false
-                    unique: true
-                    uniqueConstraintName: uk_items_name
               - column:
                   name: price
                   type: decimal(10,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted
+                  type: boolean
+                  defaultValueBoolean: false
                   constraints:
                     nullable: false
               - column:
@@ -99,6 +103,15 @@ databaseChangeLog:
                   type: timestamp
                   constraints:
                     nullable: false
+
+        - createIndex:
+            indexName: uq_items_name_active
+            tableName: items
+            unique: true
+            columns:
+              - column:
+                  name: name
+            where: deleted = false
 
         - createTable:
             tableName: order_items

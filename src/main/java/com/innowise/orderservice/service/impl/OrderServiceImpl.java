@@ -10,6 +10,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.innowise.orderservice.dto.internal.UserResponse;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
@@ -101,6 +102,7 @@ public class OrderServiceImpl implements OrderService {
      * {@inheritDoc}
      */
     @Override
+    @Transactional
     public OrderResponse updateOrder(
             UUID orderId,
             UUID currentUserId,
@@ -124,6 +126,7 @@ public class OrderServiceImpl implements OrderService {
      * {@inheritDoc}
      */
     @Override
+    @Transactional
     public OrderResponse updateOrderStatus(
             UUID orderId,
             UpdateOrderStatusRequest request,
