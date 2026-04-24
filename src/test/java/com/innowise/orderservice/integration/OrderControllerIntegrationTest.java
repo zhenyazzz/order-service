@@ -5,10 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderItemRequest;
@@ -16,6 +18,7 @@ import com.innowise.orderservice.dto.request.UpdateOrderRequest;
 import com.innowise.orderservice.dto.request.UpdateOrderStatusRequest;
 import com.innowise.orderservice.dto.response.OrderResponse;
 import com.innowise.orderservice.model.enums.OrderStatus;
+import com.innowise.orderservice.repository.OrderRepository;
 import com.innowise.orderservice.utils.OrderTestDataFactory;
 
 @DisplayName("Order API integration tests (Controller → Service → Repository → DB)")
@@ -28,6 +31,27 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
     private static final UUID ORDER_CANCELLED_B = UUID.fromString("aaaaaaaa-0003-4003-8003-000000000003");
     private static final UUID USER_C_NO_SEED = UUID.fromString("cccccccc-cccc-4ccc-8ccc-ccccccccccc1");
     private static final UUID ITEM_DEMO_GADGET = UUID.fromString("22222222-2222-4222-8222-222222222222");
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @BeforeEach
+    void resetSeedOrdersState() {
+        orderRepository.findById(ORDER_PENDING_A).ifPresent(o -> {
+            o.setStatus(OrderStatus.PENDING);
+            orderRepository.save(o);
+        });
+
+        orderRepository.findById(ORDER_CONFIRMED_A).ifPresent(o -> {
+            o.setStatus(OrderStatus.CONFIRMED);
+            orderRepository.save(o);
+        });
+
+        orderRepository.findById(ORDER_CANCELLED_B).ifPresent(o -> {
+            o.setStatus(OrderStatus.CANCELLED);
+            orderRepository.save(o);
+        });
+    }
 
     private void stubSeedUsersBatch() {
         stubInternalUsersByIds("[" + userResponseJson(USER_A, "Test", "buyer@example.com") + ","
