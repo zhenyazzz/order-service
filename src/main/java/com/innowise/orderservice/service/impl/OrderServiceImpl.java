@@ -185,29 +185,32 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
 
-        Order order = orderPersistence.findById(UUID.fromString(paymentCreatedEvent.orderId()));
-
-        OrderStatus targetStatus = paymentCreatedEvent.status() == PaymentStatus.SUCCESS
-                ? OrderStatus.CONFIRMED
-                : OrderStatus.CANCELLED;
-
-        OrderStatus currentStatus = order.getStatus();
-        if (currentStatus == targetStatus) {
-            return;
-        }
-
-        if (!currentStatus.canTransitionTo(targetStatus)) {
-            log.warn(
-                "Skipping payment event with invalid order transition: paymentId={}, orderId={}, currentStatus={}, targetStatus={}",
-                paymentCreatedEvent.paymentId(),
-                paymentCreatedEvent.orderId(),
-                currentStatus,
-                targetStatus
+        if (paymentCreatedEvent.status() == PaymentStatus.FAILED) {
+            log.debug(
+                "Ignoring failed payment attempt for order state update: paymentId={}, orderId={}",
+                paymentId,
+                paymentCreatedEvent.orderId()
             );
             return;
         }
 
-        order.setStatus(targetStatus);
+        Order order = orderPersistence.findById(UUID.fromString(paymentCreatedEvent.orderId()));
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus == OrderStatus.CONFIRMED) {
+            return;
+        }
+
+        if (currentStatus != OrderStatus.PENDING) {
+            log.warn(
+                "Skipping successful payment event for non-pending order: paymentId={}, orderId={}, currentStatus={}",
+                paymentCreatedEvent.paymentId(),
+                paymentCreatedEvent.orderId(),
+                currentStatus
+            );
+            return;
+        }
+
+        order.setStatus(OrderStatus.CONFIRMED);
         orderPersistence.save(order);
     }
 

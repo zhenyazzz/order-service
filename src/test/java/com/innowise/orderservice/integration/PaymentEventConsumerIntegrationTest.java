@@ -68,8 +68,8 @@ class PaymentEventConsumerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("when payment fails sets order status to CANCELLED, persists order and saves processed row")
-    void whenFailed_setsOrderCancelled() throws Exception {
+    @DisplayName("when payment fails keeps order pending and saves processed row")
+    void whenFailed_keepsOrderPending() throws Exception {
         String paymentId = "payment-failed-" + UUID.randomUUID();
         publishPaymentEvent(paymentId, ORDER_PENDING_A, PaymentStatus.FAILED);
 
@@ -78,7 +78,7 @@ class PaymentEventConsumerIntegrationTest extends AbstractIntegrationTest {
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
                     Order updatedOrder = orderRepository.findById(ORDER_PENDING_A).orElseThrow();
-                    assertThat(updatedOrder.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+                    assertThat(updatedOrder.getStatus()).isEqualTo(OrderStatus.PENDING);
                     assertThat(processedPaymentEventRepository.existsById(paymentId)).isTrue();
                 });
     }

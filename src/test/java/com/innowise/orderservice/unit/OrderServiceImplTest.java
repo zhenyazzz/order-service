@@ -691,19 +691,19 @@ class OrderServiceImplTest {
         }
 
         @Test
-        @DisplayName("when payment fails sets order status to CANCELLED and persists processed row")
-        void whenFailed_setsOrderCancelled() {
+        @DisplayName("when payment fails ignores order state update and persists processed row")
+        void whenFailed_ignoresOrderUpdate() {
             PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.FAILED);
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
             ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
 
-            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
             when(processedPaymentEventMapper.toEntity(event)).thenReturn(processedRow);
 
             orderService.processPaymentEvent(event);
 
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-            verify(orderPersistence).save(order);
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+            verify(orderPersistence, never()).findById(any());
+            verify(orderPersistence, never()).save(any(Order.class));
             verify(processedPaymentRepository).saveAndFlush(processedRow);
         }
 
