@@ -26,6 +26,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import com.innowise.orderservice.application.order.CreateOrderCommand;
@@ -50,7 +51,13 @@ import com.innowise.orderservice.persistence.OrderPersistence;
 import com.innowise.orderservice.security.SecurityUtils;
 import com.innowise.orderservice.service.impl.OrderServiceImpl;
 import com.innowise.orderservice.client.UserIntegrationService;
+import com.innowise.orderservice.consumer.PaymentCreatedEvent;
+import com.innowise.orderservice.consumer.PaymentStatus;
+import com.innowise.orderservice.mapper.ProcessedPaymentEventMapper;
+import com.innowise.orderservice.model.ProcessedPaymentEvent;
+import com.innowise.orderservice.repository.ProcessedPaymentEventRepository;
 import com.innowise.orderservice.utils.OrderTestDataFactory;
+import com.innowise.orderservice.utils.PaymentTestDataFactory;
 
 import org.mockito.Mockito;
 
@@ -63,6 +70,12 @@ class OrderServiceImplTest {
 
     @Mock
     private OrderPersistence orderPersistence;
+
+    @Mock
+    private ProcessedPaymentEventRepository processedPaymentRepository;
+
+    @Mock
+    private ProcessedPaymentEventMapper processedPaymentEventMapper;
 
     @Mock
     private OrderMapper orderMapper;
@@ -651,6 +664,81 @@ class OrderServiceImplTest {
             orderService.deleteOrdersForUser(OrderTestDataFactory.USER_ID);
 
             verify(orderPersistence).deleteAllByUserId(OrderTestDataFactory.USER_ID);
+        }
+    }
+
+    @Nested
+    @DisplayName("processPaymentEvent")
+    class ProcessPaymentEvent {
+
+        @Test
+        @DisplayName("when payment succeeds loads order, sets CONFIRMED, saves order and processed row")
+        void whenSuccessful_updatesOrderStatusToConfirmed() {
+            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.SUCCESS);
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
+
+            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+            when(processedPaymentEventMapper.toEntity(event)).thenReturn(processedRow);
+
+            orderService.processPaymentEvent(event);
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+            verify(orderPersistence).findById(OrderTestDataFactory.ORDER_ID);
+            verify(orderPersistence).save(order);
+            verify(processedPaymentEventMapper).toEntity(event);
+            verify(processedPaymentRepository).saveAndFlush(processedRow);
+        }
+
+        @Test
+        @DisplayName("when payment fails sets order status to CANCELLED and persists processed row")
+        void whenFailed_setsOrderCancelled() {
+            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.FAILED);
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
+            ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
+
+            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+            when(processedPaymentEventMapper.toEntity(event)).thenReturn(processedRow);
+
+            orderService.processPaymentEvent(event);
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            verify(orderPersistence).save(order);
+            verify(processedPaymentRepository).saveAndFlush(processedRow);
+        }
+
+        @Test
+        @DisplayName("when duplicate payment marker insert occurs ignores duplicate and completes")
+        void whenDuplicateMarkerInsert_ignoresConflict() {
+            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent();
+            ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
+            when(processedPaymentEventMapper.toEntity(event)).thenReturn(processedRow);
+            when(processedPaymentRepository.saveAndFlush(processedRow))
+                    .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
+
+            orderService.processPaymentEvent(event);
+
+            verify(processedPaymentEventMapper).toEntity(event);
+            verify(processedPaymentRepository).saveAndFlush(processedRow);
+            verify(orderPersistence, never()).findById(any());
+            verify(orderPersistence, never()).save(any(Order.class));
+        }
+
+        @Test
+        @DisplayName("when transition is invalid skips order update")
+        void whenInvalidTransition_skipsOrderUpdate() {
+            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.SUCCESS);
+            Order order = OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED);
+            ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
+
+            when(orderPersistence.findById(OrderTestDataFactory.ORDER_ID)).thenReturn(order);
+            when(processedPaymentEventMapper.toEntity(event)).thenReturn(processedRow);
+
+            orderService.processPaymentEvent(event);
+
+            verify(processedPaymentRepository).saveAndFlush(processedRow);
+            verify(orderPersistence).findById(OrderTestDataFactory.ORDER_ID);
+            verify(orderPersistence, never()).save(any(Order.class));
         }
     }
 }
