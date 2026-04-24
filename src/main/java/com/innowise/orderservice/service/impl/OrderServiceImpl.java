@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +22,22 @@ import com.innowise.orderservice.dto.response.OrderResponse;
 import com.innowise.orderservice.service.OrderService;
 
 import com.innowise.orderservice.client.UserIntegrationService;
+import com.innowise.orderservice.consumer.PaymentCreatedEvent;
+import com.innowise.orderservice.consumer.PaymentStatus;
 import com.innowise.orderservice.exception.conflict.InvalidOrderStateException;
 import com.innowise.orderservice.exception.security.ForbiddenException;
 import com.innowise.orderservice.mapper.OrderCommandMapper;
 import com.innowise.orderservice.mapper.OrderMapper;
+import com.innowise.orderservice.mapper.ProcessedPaymentEventMapper;
 import com.innowise.orderservice.model.Order;
 import com.innowise.orderservice.model.enums.OrderStatus;
 import com.innowise.orderservice.persistence.OrderPersistence;
+import com.innowise.orderservice.repository.ProcessedPaymentEventRepository;
 import com.innowise.orderservice.repository.specification.OrderSpecification;
 import com.innowise.orderservice.security.SecurityUtils;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Default implementation of {@link OrderService}.
@@ -39,6 +45,7 @@ import lombok.RequiredArgsConstructor;
  * Loads and validates users via {@link UserIntegrationService}, applies owner/admin access rules,
  * and maps entities to API responses. Status changes use {@link OrderStatus} transition rules.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -47,6 +54,8 @@ public class OrderServiceImpl implements OrderService {
     private final UserIntegrationService userIntegrationService;
     private final OrderMapper orderMapper;
     private final OrderCommandMapper orderCommandMapper;
+    private final ProcessedPaymentEventRepository processedPaymentRepository;
+    private final ProcessedPaymentEventMapper processedPaymentEventMapper;
 
     /**
      * {@inheritDoc}
@@ -177,6 +186,47 @@ public class OrderServiceImpl implements OrderService {
         if (!isOwner && !isAdmin) {
             throw new ForbiddenException("No access to this order");
         }
+    }
+
+    @Override
+    @Transactional
+    public void processPaymentEvent(PaymentCreatedEvent paymentCreatedEvent) {
+        try {
+            processedPaymentRepository.saveAndFlush(processedPaymentEventMapper.toEntity(paymentCreatedEvent));
+        } catch (DataIntegrityViolationException duplicatePayment) {
+            log.debug(
+                "Skipping duplicate payment event: paymentId={}, orderId={}, status={}",
+                paymentCreatedEvent.paymentId(),
+                paymentCreatedEvent.orderId(),
+                paymentCreatedEvent.status()
+            );
+            return;
+        }
+
+        Order order = orderPersistence.findById(UUID.fromString(paymentCreatedEvent.orderId()));
+
+        OrderStatus targetStatus = paymentCreatedEvent.status() == PaymentStatus.SUCCESS
+                ? OrderStatus.CONFIRMED
+                : OrderStatus.CANCELLED;
+
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus == targetStatus) {
+            return;
+        }
+
+        if (!currentStatus.canTransitionTo(targetStatus)) {
+            log.warn(
+                "Skipping payment event with invalid order transition: paymentId={}, orderId={}, currentStatus={}, targetStatus={}",
+                paymentCreatedEvent.paymentId(),
+                paymentCreatedEvent.orderId(),
+                currentStatus,
+                targetStatus
+            );
+            return;
+        }
+
+        order.setStatus(targetStatus);
+        orderPersistence.save(order);
     }
 
     private OrderResponse toResponseWithUser(Order order) {
