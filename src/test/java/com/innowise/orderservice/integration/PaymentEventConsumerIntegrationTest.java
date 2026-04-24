@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.TestPropertySource;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import tools.jackson.databind.ObjectMapper;
 import com.innowise.orderservice.consumer.PaymentCreatedEvent;
 import com.innowise.orderservice.consumer.PaymentStatus;
@@ -132,7 +131,7 @@ class PaymentEventConsumerIntegrationTest extends AbstractIntegrationTest {
                 });
     }
 
-    private void publishPaymentEvent(String paymentId, UUID orderId, PaymentStatus status) throws JsonProcessingException {
+    private void publishPaymentEvent(String paymentId, UUID orderId, PaymentStatus status) {
         PaymentCreatedEvent event = new PaymentCreatedEvent(paymentId, orderId.toString(), status);
         String payload = objectMapper.writeValueAsString(event);
         kafkaTemplate.send(paymentEventsTopic, payload).join();

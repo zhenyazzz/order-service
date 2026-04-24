@@ -39,12 +39,6 @@ import com.innowise.orderservice.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Default implementation of {@link OrderService}.
- * <p>
- * Loads and validates users via {@link UserIntegrationService}, applies owner/admin access rules,
- * and maps entities to API responses. Status changes use {@link OrderStatus} transition rules.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -57,9 +51,6 @@ public class OrderServiceImpl implements OrderService {
     private final ProcessedPaymentEventRepository processedPaymentRepository;
     private final ProcessedPaymentEventMapper processedPaymentEventMapper;
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request) {
         UserResponse user = userIntegrationService.getInternalUserById(userId);
@@ -67,9 +58,6 @@ public class OrderServiceImpl implements OrderService {
         return orderMapper.toResponse(order, user);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public OrderResponse getOrderById(UUID orderId, UUID currentUserId) {
         Order order = orderPersistence.findById(orderId);
@@ -79,9 +67,6 @@ public class OrderServiceImpl implements OrderService {
         return toResponseWithUser(order);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Page<OrderResponse> getOrders(
             OrderSearchFilterRequest filter,
@@ -95,9 +80,6 @@ public class OrderServiceImpl implements OrderService {
         return findOrdersWithUserEnrichment(filter, pageable, userFilter);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Page<OrderResponse> getOrdersByUserId(
             OrderSearchFilterRequest filter,
@@ -107,9 +89,6 @@ public class OrderServiceImpl implements OrderService {
         return findOrdersWithUserEnrichment(filter, pageable, userId);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public OrderResponse updateOrder(
@@ -131,9 +110,6 @@ public class OrderServiceImpl implements OrderService {
         return toResponseWithUser(updated);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public OrderResponse updateOrderStatus(
@@ -163,17 +139,11 @@ public class OrderServiceImpl implements OrderService {
         return toResponseWithUser(updated);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void deleteOrder(UUID orderId) {
         orderPersistence.deleteById(orderId);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void deleteOrdersForUser(UUID userId) {
         orderPersistence.deleteAllByUserId(userId);
