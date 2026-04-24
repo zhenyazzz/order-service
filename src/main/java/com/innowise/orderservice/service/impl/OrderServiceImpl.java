@@ -191,12 +191,24 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void processPaymentEvent(PaymentCreatedEvent paymentCreatedEvent) {
+        String paymentId = paymentCreatedEvent.paymentId();
+
+        if (processedPaymentRepository.existsById(paymentId)) {
+            log.debug(
+                "Skipping already processed payment event: paymentId={}, orderId={}, status={}",
+                paymentId,
+                paymentCreatedEvent.orderId(),
+                paymentCreatedEvent.status()
+            );
+            return;
+        }
+
         try {
             processedPaymentRepository.saveAndFlush(processedPaymentEventMapper.toEntity(paymentCreatedEvent));
         } catch (DataIntegrityViolationException duplicatePayment) {
             log.debug(
                 "Skipping duplicate payment event: paymentId={}, orderId={}, status={}",
-                paymentCreatedEvent.paymentId(),
+                paymentId,
                 paymentCreatedEvent.orderId(),
                 paymentCreatedEvent.status()
             );

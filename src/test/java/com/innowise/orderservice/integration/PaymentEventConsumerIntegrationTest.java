@@ -106,8 +106,8 @@ class PaymentEventConsumerIntegrationTest extends AbstractIntegrationTest {
         publishPaymentEvent(paymentId, ORDER_PENDING_A, PaymentStatus.FAILED);
 
         await()
-                .during(Duration.ofSeconds(2))
-                .atMost(Duration.ofSeconds(3))
+                .during(Duration.ofSeconds(3))
+                .atMost(Duration.ofSeconds(5))
                 .pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> {
                     Order updatedOrder = orderRepository.findById(ORDER_PENDING_A).orElseThrow();
