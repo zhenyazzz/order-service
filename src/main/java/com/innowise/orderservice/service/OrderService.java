@@ -1,5 +1,6 @@
 package com.innowise.orderservice.service;
 
+import com.innowise.orderservice.consumer.PaymentCreatedEvent;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderSearchFilterRequest;
 import com.innowise.orderservice.dto.request.UpdateOrderRequest;
@@ -101,4 +102,11 @@ public interface OrderService {
      * @param userId user whose orders are removed
      */
     void deleteOrdersForUser(UUID userId);
+    
+    /**
+     * Processes a payment event.
+     *
+     * @param paymentCreatedEvent payment event
+     */
+    void processPaymentEvent(PaymentCreatedEvent paymentCreatedEvent);
 }

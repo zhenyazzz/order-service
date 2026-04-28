@@ -30,7 +30,6 @@
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.organization>zhenyazzz</sonar.organization>
         <sonar.projectKey>zhenyazzz_order-service</sonar.projectKey>
-        <!-- Keep in sync with jacoco-maven-plugin <excludes> below (Sonar does not read sonar.* for JaCoCo). -->
         <sonar.coverage.exclusions>
             **/config/**,
             **/exception/**,
@@ -129,6 +128,17 @@
         </dependency>
 
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        
+        <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
@@ -177,6 +187,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
             <scope>test</scope>
         </dependency>
 

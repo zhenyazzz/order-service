@@ -13,6 +13,21 @@ spring:
   liquibase:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  kafka:
+    listener:
+      auto-startup: false
+    admin:
+      auto-create: true
+    properties:
+      allow.auto.create.topics: true
+    consumer:
+      auto-offset-reset: earliest
+      group-id: order-service-test-group
+
+
+kafka:
+  topics:
+    payment-events: test-payment-events
 
 resilience4j:
   circuitbreaker:
