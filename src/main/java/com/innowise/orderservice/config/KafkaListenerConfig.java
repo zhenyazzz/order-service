@@ -26,11 +26,11 @@ public class KafkaListenerConfig {
     }
 
     @Bean
-    ConcurrentKafkaListenerContainerFactory<Object, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<Object, Object> consumerFactory,
+    ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
+            ConsumerFactory<String, String> consumerFactory,
             DefaultErrorHandler kafkaErrorHandler
     ) {
-        ConcurrentKafkaListenerContainerFactory<Object, Object> factory =
+        ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setCommonErrorHandler(kafkaErrorHandler);

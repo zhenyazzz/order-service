@@ -69,7 +69,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                 .header("X-User-Id", userId.toString())
                 .header("X-User-Email", email)
                 .header("X-User-Roles", "ROLE_USER")
-                .header("Idempotency-Key", idempotencyKey)
+                .header("X-Idempotency-Key", idempotencyKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -102,7 +102,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when Idempotency-Key is missing returns 400")
+        @DisplayName("when X-Idempotency-Key is missing returns 400")
         void whenIdempotencyKeyMissing_returns400() {
             stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
 
@@ -119,7 +119,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when Idempotency-Key repeats returns cached response")
+        @DisplayName("when X-Idempotency-Key repeats returns cached response")
         void whenSameIdempotencyKey_returnsCachedResponse() {
             String idemKey = UUID.randomUUID().toString();
 
@@ -414,7 +414,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(update)
                     .exchange()
@@ -443,7 +443,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_B.toString())
                     .header("X-User-Email", "other@example.com")
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(update)
                     .exchange()
@@ -466,7 +466,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_B.toString())
                     .header("X-User-Email", "other@example.com")
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(update)
                     .exchange()
@@ -496,7 +496,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -521,7 +521,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -533,7 +533,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -557,7 +557,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -579,7 +579,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_B.toString())
                     .header("X-User-Email", "other@example.com")
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -602,7 +602,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .exchange()
                     .expectStatus().isNoContent();
 
@@ -648,7 +648,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .exchange()
                     .expectStatus().isNoContent();
 
@@ -676,13 +676,13 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .exchange()
                     .expectStatus().isForbidden();
         }
 
         @Test
-        @DisplayName("when Idempotency-Key is missing returns 400")
+        @DisplayName("when X-Idempotency-Key is missing returns 400")
         void whenIdempotencyKeyMissing_returns400() {
             webTestClient
                     .delete()
