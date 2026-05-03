@@ -5,6 +5,7 @@ on:
     branches: [ main, dev ]
   pull_request:
     branches: [ main, dev ]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -55,7 +56,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           if [ -z "${SONAR_TOKEN:-}" ]; then
-            echo "Skipping SonarQube (SONAR_TOKEN not configured)"
             exit 0
           fi
           set -e
@@ -69,31 +69,18 @@ jobs:
             -Dsonar.host.url="$SONAR_URL" \
             -Dsonar.verbose=true
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-jar
-          path: target/*.jar
-          retention-days: 1
-
   docker:
     name: Build & Push Docker image to Docker Hub
-    if: github.event_name == 'push'
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     needs: build-test-sonar
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Download JAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-jar
-          path: target
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -104,13 +91,22 @@ jobs:
           username: zhenya465
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Docker image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=ref,event=pr
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref_name == 'main' }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}:${{ github.ref_name }}
-            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
-            ${{ env.DOCKER_IMAGE }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
