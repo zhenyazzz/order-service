@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import com.innowise.orderservice.security.HeaderAuthenticationFilter;
 
@@ -24,8 +25,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/actuator/health/**",
-                    "/actuator/info"
+                    PathPatternRequestMatcher.pathPattern("/actuator/health/**"),
+                    PathPatternRequestMatcher.pathPattern("/actuator/info")
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST, "/orders").authenticated()
                 .requestMatchers(HttpMethod.GET, "/orders/user/**").hasRole(ADMIN_ROLE)
@@ -33,7 +34,6 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-   
 
         return http.build();
     }
