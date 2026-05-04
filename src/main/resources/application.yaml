@@ -64,3 +64,13 @@ resilience4j:
             - io.github.resilience4j.circuitbreaker.CallNotPermittedException
             - feign.FeignException.NotFound
             - feign.FeignException.BadRequest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

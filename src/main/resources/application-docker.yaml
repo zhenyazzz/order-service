@@ -1,3 +1,6 @@
+server:
+  port: 8083
+
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://order-service-postgresql:5432/order_service_db}
@@ -11,4 +14,4 @@ spring:
       port: ${SPRING_DATA_REDIS_PORT:6379}
 
 user-service:
-  url: ${USER_SERVICE_URL:http://host.docker.internal:8082}
+  url: ${USER_SERVICE_URL:http://host.docker.internal:8081}
