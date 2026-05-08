@@ -45,7 +45,7 @@ public class PaymentEventConsumer {
         }
 
         switch (eventType) {
-            case "PAYMENT_CREATED" -> {
+            case "CREATE_PAYMENT" -> {
                 CreatePaymentEvent createPaymentEvent = objectMapper.readValue(
                     messagePayload, CreatePaymentEvent.class
                 );
