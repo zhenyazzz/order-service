@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalExceptionHandler {
 
     private static final String TRACE_ID_KEY = "traceId";
+    private static final String BAD_REQUEST_TITLE = "Bad request";
 
     private ProblemDetail build(HttpStatus status, String title, String detail) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
@@ -131,7 +132,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
-        return toResponse(status, build(status, "Bad request", ex.getMessage()));
+        return toResponse(status, build(status, BAD_REQUEST_TITLE, ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -145,14 +146,14 @@ public class GlobalExceptionHandler {
         }
 
         HttpStatus status = HttpStatus.BAD_REQUEST;
-        return toResponse(status, build(status, "Bad request", message));
+        return toResponse(status, build(status, BAD_REQUEST_TITLE, message));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ProblemDetail> handleMissingRequestHeader(MissingRequestHeaderException ex) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
         String message = "Missing required header '" + ex.getHeaderName() + "'";
-        return toResponse(status, build(status, "Bad request", message));
+        return toResponse(status, build(status, BAD_REQUEST_TITLE, message));
     }
 
     @ExceptionHandler(Exception.class)

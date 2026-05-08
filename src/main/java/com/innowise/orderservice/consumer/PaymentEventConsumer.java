@@ -41,7 +41,6 @@ public class PaymentEventConsumer {
             }
             default -> {
                 log.warn("Skipping unknown event type: {}", eventType);
-                return;
             }
         }
     }

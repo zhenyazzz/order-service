@@ -136,9 +136,9 @@ class PaymentEventConsumerIntegrationTest extends AbstractIntegrationTest {
     private void publishPaymentEvent(String paymentId, UUID orderId, PaymentStatus status) {
         CreatePaymentEvent event = new CreatePaymentEvent(paymentId, orderId.toString(), status);
         String payload = objectMapper.writeValueAsString(event);
-        ProducerRecord<String, String> record = new ProducerRecord<>(paymentEventsTopic, payload);
-        record.headers().add("event_type", "PAYMENT_CREATED".getBytes(StandardCharsets.UTF_8));
-        record.headers().add("event_id", paymentId.getBytes(StandardCharsets.UTF_8));
-        kafkaTemplate.send(record).join();
+        ProducerRecord<String, String> producerRecord = new ProducerRecord<>(paymentEventsTopic, payload);
+        producerRecord.headers().add("event_type", "PAYMENT_CREATED".getBytes(StandardCharsets.UTF_8));
+        producerRecord.headers().add("event_id", paymentId.getBytes(StandardCharsets.UTF_8));
+        kafkaTemplate.send(producerRecord).join();
     }
 }
