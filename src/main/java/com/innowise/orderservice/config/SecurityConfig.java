@@ -34,6 +34,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.GET, "/orders/internal/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/orders").authenticated()
                 .requestMatchers(HttpMethod.GET, "/orders/user/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.DELETE, "/orders/**").hasRole(ADMIN_ROLE)

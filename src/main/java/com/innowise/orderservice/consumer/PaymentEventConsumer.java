@@ -1,6 +1,7 @@
 package com.innowise.orderservice.consumer;
 
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.ObjectMapper;
@@ -20,13 +21,28 @@ public class PaymentEventConsumer {
         topics = "${kafka.topics.payment-events:payment-events}", 
         groupId = "${spring.kafka.consumer.group-id:order-service-group}"
     )
-    public void consumePaymentEvent(String messagePayload) {
-        PaymentCreatedEvent paymentCreatedEvent = objectMapper.readValue(
-            messagePayload, PaymentCreatedEvent.class
-        );
-        
-        log.info("Processing payment event: {}", paymentCreatedEvent);
+    public void consumePaymentEvent(
+        String messagePayload,
+        @Header(value = "event_type") String eventType,
+        @Header(value = "event_id") String eventId
+        ) {
+        if (eventType == null || eventType.isBlank()) {
+            log.warn("Skipping message without event_type header. eventId={}", eventId);
+            return;
+        }
 
-        orderService.processPaymentEvent(paymentCreatedEvent);
+        switch (eventType) {
+            case "PAYMENT_CREATED" -> {
+                CreatePaymentEvent createPaymentEvent = objectMapper.readValue(
+                    messagePayload, CreatePaymentEvent.class
+                );
+                log.info("Processing payment event: {}", createPaymentEvent);
+                orderService.processPaymentEvent(createPaymentEvent);
+            }
+            default -> {
+                log.warn("Skipping unknown event type: {}", eventType);
+                return;
+            }
+        }
     }
 }

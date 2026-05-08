@@ -1,6 +1,6 @@
 package com.innowise.orderservice.consumer;
 
-public record PaymentCreatedEvent(
+public record CreatePaymentEvent(
     String paymentId,
     String orderId,
     PaymentStatus status

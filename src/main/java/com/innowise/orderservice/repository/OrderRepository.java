@@ -1,5 +1,6 @@
 package com.innowise.orderservice.repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,6 +11,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.innowise.orderservice.model.Order;
@@ -28,5 +31,13 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
 
     @EntityGraph(value = "order-with-items", type = EntityGraph.EntityGraphType.LOAD)
     Page<Order> findAll(Specification<Order> spec, Pageable pageable);
+
+    @Query("""
+        SELECT COALESCE(SUM(oi.item.price * oi.quantity), 0)
+        FROM Order o
+        JOIN o.orderItems oi
+        WHERE o.id = :orderId AND o.userId = :userId
+        """)
+    BigDecimal calculateOrderTotalPrice(@Param("orderId") UUID orderId, @Param("userId") UUID userId);
 
 }

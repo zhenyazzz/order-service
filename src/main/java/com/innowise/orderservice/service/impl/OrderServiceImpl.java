@@ -1,5 +1,6 @@
 package com.innowise.orderservice.service.impl;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,7 +23,7 @@ import com.innowise.orderservice.dto.response.OrderResponse;
 import com.innowise.orderservice.service.OrderService;
 
 import com.innowise.orderservice.client.UserIntegrationService;
-import com.innowise.orderservice.consumer.PaymentCreatedEvent;
+import com.innowise.orderservice.consumer.CreatePaymentEvent;
 import com.innowise.orderservice.consumer.PaymentStatus;
 import com.innowise.orderservice.exception.conflict.InvalidOrderStateException;
 import com.innowise.orderservice.exception.security.ForbiddenException;
@@ -65,6 +66,11 @@ public class OrderServiceImpl implements OrderService {
         validateAccess(order, currentUserId);
 
         return toResponseWithUser(order);
+    }
+
+    @Override
+    public BigDecimal getOrderTotalPrice(UUID orderId, UUID userId) {
+        return orderPersistence.getOrderTotalPriceByOrderIdAndUserId(orderId, userId);
     }
 
     @Override
@@ -160,41 +166,41 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public void processPaymentEvent(PaymentCreatedEvent paymentCreatedEvent) {
-        String paymentId = paymentCreatedEvent.paymentId();
+    public void processPaymentEvent(CreatePaymentEvent createPaymentEvent) {
+        String paymentId = createPaymentEvent.paymentId();
 
         if (processedPaymentRepository.existsById(paymentId)) {
             log.debug(
                 "Skipping already processed payment event: paymentId={}, orderId={}, status={}",
                 paymentId,
-                paymentCreatedEvent.orderId(),
-                paymentCreatedEvent.status()
+                createPaymentEvent.orderId(),
+                createPaymentEvent.status()
             );
             return;
         }
 
         try {
-            processedPaymentRepository.saveAndFlush(processedPaymentEventMapper.toEntity(paymentCreatedEvent));
+            processedPaymentRepository.saveAndFlush(processedPaymentEventMapper.toEntity(createPaymentEvent));
         } catch (DataIntegrityViolationException duplicatePayment) {
             log.debug(
                 "Skipping duplicate payment event: paymentId={}, orderId={}, status={}",
                 paymentId,
-                paymentCreatedEvent.orderId(),
-                paymentCreatedEvent.status()
+                createPaymentEvent.orderId(),
+                createPaymentEvent.status()
             );
             return;
         }
 
-        if (paymentCreatedEvent.status() == PaymentStatus.FAILED) {
+        if (createPaymentEvent.status() == PaymentStatus.FAILED) {
             log.debug(
                 "Ignoring failed payment attempt for order state update: paymentId={}, orderId={}",
                 paymentId,
-                paymentCreatedEvent.orderId()
+                createPaymentEvent.orderId()
             );
             return;
         }
 
-        Order order = orderPersistence.findById(UUID.fromString(paymentCreatedEvent.orderId()));
+        Order order = orderPersistence.findById(UUID.fromString(createPaymentEvent.orderId()));
         OrderStatus currentStatus = order.getStatus();
         if (currentStatus == OrderStatus.CONFIRMED) {
             return;
@@ -203,8 +209,8 @@ public class OrderServiceImpl implements OrderService {
         if (currentStatus != OrderStatus.PENDING) {
             log.warn(
                 "Skipping successful payment event for non-pending order: paymentId={}, orderId={}, currentStatus={}",
-                paymentCreatedEvent.paymentId(),
-                paymentCreatedEvent.orderId(),
+                createPaymentEvent.paymentId(),
+                createPaymentEvent.orderId(),
                 currentStatus
             );
             return;

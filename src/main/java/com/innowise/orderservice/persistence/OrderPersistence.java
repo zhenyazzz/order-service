@@ -55,6 +55,12 @@ public class OrderPersistence {
     }
 
     @Transactional(readOnly = true)
+    public BigDecimal getOrderTotalPriceByOrderIdAndUserId(UUID orderId, UUID userId) {
+        findByIdAndUserId(orderId, userId);
+        return orderRepository.calculateOrderTotalPrice(orderId, userId);
+    }
+
+    @Transactional(readOnly = true)
     public Page<Order> findAll(Specification<Order> spec, Pageable pageable) {
         return orderRepository.findAll(spec, pageable);
     }

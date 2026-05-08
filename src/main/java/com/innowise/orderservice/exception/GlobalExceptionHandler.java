@@ -12,6 +12,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.innowise.orderservice.exception.conflict.InvalidOrderStateException;
@@ -144,6 +145,13 @@ public class GlobalExceptionHandler {
         }
 
         HttpStatus status = HttpStatus.BAD_REQUEST;
+        return toResponse(status, build(status, "Bad request", message));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ProblemDetail> handleMissingRequestHeader(MissingRequestHeaderException ex) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        String message = "Missing required header '" + ex.getHeaderName() + "'";
         return toResponse(status, build(status, "Bad request", message));
     }
 
