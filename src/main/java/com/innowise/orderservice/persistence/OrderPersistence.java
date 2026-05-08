@@ -30,6 +30,12 @@ import com.innowise.orderservice.repository.OrderRepository;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Persistence facade for order data access and mutation.
+ *
+ * <p>Encapsulates repository access, item resolution, order recalculation, and state updates
+ * so the service layer can work with domain objects instead of direct JPA calls.</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class OrderPersistence {

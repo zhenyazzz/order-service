@@ -19,6 +19,9 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+/**
+ * Deduplication record for payment events that have already been handled by the order service.
+ */
 @Entity
 @Getter
 @Setter

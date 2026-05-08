@@ -10,6 +10,12 @@ import com.innowise.orderservice.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Kafka consumer that forwards payment outcome events into the order domain.
+ *
+ * <p>The consumer validates the event headers, deserializes the payload, and delegates the
+ * resulting domain action to {@link com.innowise.orderservice.service.OrderService}.</p>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -17,6 +23,13 @@ public class PaymentEventConsumer {
     private final OrderService orderService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Handles one payment event message from Kafka.
+     *
+     * @param messagePayload serialized payment event payload
+     * @param eventType event type header
+     * @param eventId event identifier header
+     */
     @KafkaListener(
         topics = "${kafka.topics.payment-events:payment-events}", 
         groupId = "${spring.kafka.consumer.group-id:order-service-group}"

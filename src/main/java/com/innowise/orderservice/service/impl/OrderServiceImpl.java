@@ -40,6 +40,13 @@ import com.innowise.orderservice.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Default implementation of order application operations.
+ *
+ * <p>Coordinates order persistence, access validation, user enrichment, and payment-event
+ * processing. The service owns order state transitions and delegates persistence concerns to
+ * {@link com.innowise.orderservice.persistence.OrderPersistence}.</p>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
