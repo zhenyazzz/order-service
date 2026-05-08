@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -51,7 +52,7 @@ import com.innowise.orderservice.persistence.OrderPersistence;
 import com.innowise.orderservice.security.SecurityUtils;
 import com.innowise.orderservice.service.impl.OrderServiceImpl;
 import com.innowise.orderservice.client.UserIntegrationService;
-import com.innowise.orderservice.consumer.PaymentCreatedEvent;
+import com.innowise.orderservice.consumer.CreatePaymentEvent;
 import com.innowise.orderservice.consumer.PaymentStatus;
 import com.innowise.orderservice.mapper.ProcessedPaymentEventMapper;
 import com.innowise.orderservice.model.ProcessedPaymentEvent;
@@ -197,6 +198,51 @@ class OrderServiceImplTest {
                 assertThat(result).isEqualTo(mapped);
                 verify(userIntegrationService).getInternalUserById(OrderTestDataFactory.USER_ID);
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("getOrderTotalPrice")
+    class GetOrderTotalPrice {
+
+        @Test
+        @DisplayName("delegates to persistence and returns calculated total")
+        void delegatesToPersistence() {
+            BigDecimal expectedTotal = new BigDecimal("45.50");
+
+            when(orderPersistence.getOrderTotalPriceByOrderIdAndUserId(
+                    OrderTestDataFactory.ORDER_ID,
+                    OrderTestDataFactory.USER_ID))
+                    .thenReturn(expectedTotal);
+
+            BigDecimal result = orderService.getOrderTotalPrice(
+                    OrderTestDataFactory.ORDER_ID,
+                    OrderTestDataFactory.USER_ID);
+
+            assertThat(result).isEqualByComparingTo(expectedTotal);
+            verify(orderPersistence).getOrderTotalPriceByOrderIdAndUserId(
+                    OrderTestDataFactory.ORDER_ID,
+                    OrderTestDataFactory.USER_ID);
+            verify(userIntegrationService, never()).getInternalUserById(any());
+        }
+
+        @Test
+        @DisplayName("when order does not exist propagates OrderNotFoundException")
+        void whenOrderMissing_propagatesNotFound() {
+            when(orderPersistence.getOrderTotalPriceByOrderIdAndUserId(
+                    OrderTestDataFactory.ORDER_ID,
+                    OrderTestDataFactory.USER_ID))
+                    .thenThrow(new OrderNotFoundException("Order not found"));
+
+            assertThatThrownBy(() -> orderService.getOrderTotalPrice(
+                    OrderTestDataFactory.ORDER_ID,
+                    OrderTestDataFactory.USER_ID))
+                    .isInstanceOf(OrderNotFoundException.class)
+                    .hasMessageContaining("Order not found");
+
+            verify(orderPersistence).getOrderTotalPriceByOrderIdAndUserId(
+                    OrderTestDataFactory.ORDER_ID,
+                    OrderTestDataFactory.USER_ID);
         }
     }
 
@@ -674,7 +720,7 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("when payment succeeds loads order, sets CONFIRMED, saves order and processed row")
         void whenSuccessful_updatesOrderStatusToConfirmed() {
-            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.SUCCESS);
+            CreatePaymentEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.SUCCESS);
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
             ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
 
@@ -693,7 +739,7 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("when payment fails ignores order state update and persists processed row")
         void whenFailed_ignoresOrderUpdate() {
-            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.FAILED);
+            CreatePaymentEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.FAILED);
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.PENDING);
             ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
 
@@ -710,7 +756,7 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("when duplicate payment marker insert occurs ignores duplicate and completes")
         void whenDuplicateMarkerInsert_ignoresConflict() {
-            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent();
+            CreatePaymentEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent();
             ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
             when(processedPaymentEventMapper.toEntity(event)).thenReturn(processedRow);
             when(processedPaymentRepository.saveAndFlush(processedRow))
@@ -727,7 +773,7 @@ class OrderServiceImplTest {
         @Test
         @DisplayName("when transition is invalid skips order update")
         void whenInvalidTransition_skipsOrderUpdate() {
-            PaymentCreatedEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.SUCCESS);
+            CreatePaymentEvent event = PaymentTestDataFactory.buildPaymentCreatedEvent(PaymentStatus.SUCCESS);
             Order order = OrderTestDataFactory.buildOrder(OrderStatus.CANCELLED);
             ProcessedPaymentEvent processedRow = new ProcessedPaymentEvent();
 

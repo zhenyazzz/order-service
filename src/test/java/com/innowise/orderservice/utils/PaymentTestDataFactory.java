@@ -1,6 +1,6 @@
 package com.innowise.orderservice.utils;
 
-import com.innowise.orderservice.consumer.PaymentCreatedEvent;
+import com.innowise.orderservice.consumer.CreatePaymentEvent;
 import com.innowise.orderservice.consumer.PaymentStatus;
 
 import lombok.experimental.UtilityClass;
@@ -10,12 +10,12 @@ public class PaymentTestDataFactory {
 
     public static final String PAYMENT_ID = "payment-test-1";
 
-    public PaymentCreatedEvent buildPaymentCreatedEvent() {
+    public CreatePaymentEvent buildPaymentCreatedEvent() {
         return buildPaymentCreatedEvent(PaymentStatus.SUCCESS);
     }
 
-    public PaymentCreatedEvent buildPaymentCreatedEvent(PaymentStatus status) {
-        return new PaymentCreatedEvent(
+    public CreatePaymentEvent buildPaymentCreatedEvent(PaymentStatus status) {
+        return new CreatePaymentEvent(
                 PAYMENT_ID,
                 OrderTestDataFactory.ORDER_ID.toString(),
                 status

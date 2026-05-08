@@ -3,9 +3,11 @@ package com.innowise.orderservice.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,7 +17,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 import tools.jackson.databind.ObjectMapper;
-import com.innowise.orderservice.consumer.PaymentCreatedEvent;
+import com.innowise.orderservice.consumer.CreatePaymentEvent;
 import com.innowise.orderservice.consumer.PaymentStatus;
 import com.innowise.orderservice.model.Order;
 import com.innowise.orderservice.model.enums.OrderStatus;
@@ -132,8 +134,11 @@ class PaymentEventConsumerIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void publishPaymentEvent(String paymentId, UUID orderId, PaymentStatus status) {
-        PaymentCreatedEvent event = new PaymentCreatedEvent(paymentId, orderId.toString(), status);
+        CreatePaymentEvent event = new CreatePaymentEvent(paymentId, orderId.toString(), status);
         String payload = objectMapper.writeValueAsString(event);
-        kafkaTemplate.send(paymentEventsTopic, payload).join();
+        ProducerRecord<String, String> record = new ProducerRecord<>(paymentEventsTopic, payload);
+        record.headers().add("event_type", "PAYMENT_CREATED".getBytes(StandardCharsets.UTF_8));
+        record.headers().add("event_id", paymentId.getBytes(StandardCharsets.UTF_8));
+        kafkaTemplate.send(record).join();
     }
 }

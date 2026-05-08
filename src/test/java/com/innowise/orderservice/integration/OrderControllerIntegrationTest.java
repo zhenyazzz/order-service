@@ -242,6 +242,64 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Nested
+    @DisplayName("GET /orders/internal/{id}/total-price")
+    class GetOrderTotalPrice {
+
+        @Test
+        @DisplayName("when X-User-Id matches order owner returns 200 with total price")
+        void whenOwnerHeaderProvided_returns200WithTotalPrice() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", ORDER_PENDING_A)
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalPrice").isEqualTo(45.50);
+        }
+
+        @Test
+        @DisplayName("when X-User-Id does not own order returns 404")
+        void whenUserDoesNotOwnOrder_returns404() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", ORDER_PENDING_A)
+                    .header("X-User-Id", USER_B.toString())
+                    .header("X-User-Email", "other@example.com")
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isNotFound();
+        }
+
+        @Test
+        @DisplayName("when order id does not exist returns 404")
+        void whenOrderMissing_returns404() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", UUID.fromString("dddddddd-0001-4001-8001-000000000001"))
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isNotFound();
+        }
+
+        @Test
+        @DisplayName("when X-User-Id header is missing returns 400")
+        void whenUserIdHeaderMissing_returns400() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", ORDER_PENDING_A)
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isBadRequest();
+        }
+    }
+
+    @Nested
     @DisplayName("GET /orders")
     class GetOrders {
 

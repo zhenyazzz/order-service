@@ -9,6 +9,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${ORDER_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
   liquibase:
     contexts: dev
@@ -20,3 +22,4 @@ spring:
 
 user-service:
   url: ${USER_SERVICE_URL:http://localhost:8081}
+
