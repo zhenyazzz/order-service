@@ -23,3 +23,11 @@ spring:
 user-service:
   url: ${USER_SERVICE_URL:http://localhost:8081}
 
+management:
+  tracing:
+    enabled: ${MONITORING_TRACING_ENABLED:${MONITORING_ENABLED:false}}
+  otlp:
+    metrics:
+      export:
+        enabled: ${MONITORING_METRICS_ENABLED:${MONITORING_ENABLED:false}}
+
