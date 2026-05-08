@@ -1,3 +1,6 @@
+server:
+  port: 8083
+
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://order-service-postgresql:5432/order_service_db}
@@ -9,6 +12,21 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:redis}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:29092}
 
 user-service:
-  url: ${USER_SERVICE_URL:http://host.docker.internal:8082}
+  url: ${USER_SERVICE_URL:http://host.docker.internal:8081}
+
+management:
+  tracing:
+    enabled: ${MONITORING_TRACING_ENABLED:${MONITORING_ENABLED:true}}
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://otel-collector:4318/v1/traces}
+    metrics:
+      export:
+        enabled: ${MONITORING_METRICS_ENABLED:${MONITORING_ENABLED:true}}
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://otel-collector:4318/v1/metrics}

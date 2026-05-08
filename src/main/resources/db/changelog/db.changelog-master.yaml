@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/01-init-schema.yaml
   - include:
       file: db/changelog/changes/02-dev-seed-data.yaml
+  - include:
+      file: db/changelog/changes/03-processed-payment-events.yaml

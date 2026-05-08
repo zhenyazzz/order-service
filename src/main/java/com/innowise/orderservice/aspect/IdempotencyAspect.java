@@ -39,7 +39,7 @@ public class IdempotencyAspect {
     @Value("${idempotency.processing-ttl-minutes:5}")
     private long processingTtlMinutes;
     
-    private static final String IDEMPOTENCY_HEADER = "Idempotency-Key";
+    private static final String IDEMPOTENCY_HEADER = "X-Idempotency-Key";
     private static final String REDIS_KEY_NAMESPACE = "idempotency:";
 
     @Around("@annotation(idempotent)")

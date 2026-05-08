@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 3-create-processed-payment-events
+      author: internship
+      changes:
+        - createTable:
+            tableName: processed_payment_events
+            columns:
+              - column:
+                  name: payment_id
+                  type: varchar(255)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: order_id
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: processed_at
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            indexName: idx_processed_payment_events_order_id
+            tableName: processed_payment_events
+            columns:
+              - column:
+                  name: order_id

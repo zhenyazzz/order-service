@@ -5,14 +5,20 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -43,7 +49,12 @@ public abstract class AbstractIntegrationTest {
     static GenericContainer<?> redis = new GenericContainer<>("redis:8")
             .withExposedPorts(6379);
 
-    protected static WireMockServer wireMock = new WireMockServer(wireMockConfig().port(8089));
+    protected static WireMockServer wireMock = new WireMockServer(wireMockConfig().dynamicPort());
+
+    @Container
+    static KafkaContainer kafka = new KafkaContainer(
+        DockerImageName.parse("apache/kafka-native:3.9.2")
+    );
 
     @BeforeAll
     static void startWireMock() {
@@ -58,6 +69,7 @@ public abstract class AbstractIntegrationTest {
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add("USER_SERVICE_URL", wireMock::baseUrl);
+        registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
     }
 
     protected static String userResponseJson(UUID id, String name, String email) {
@@ -88,5 +100,16 @@ public abstract class AbstractIntegrationTest {
 
     protected void verifyUsersByIdsCalled() {
         wireMock.verify(postRequestedFor(urlEqualTo("/users/internal/by-ids")));
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class KafkaTestConfig {
+        @Bean
+        NewTopic paymentEventsTopic() {
+            return TopicBuilder.name("test-payment-events")
+                    .partitions(1)
+                    .replicas(1)
+                    .build();
+        }
     }
 }

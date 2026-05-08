@@ -1,5 +1,6 @@
 package com.innowise.orderservice.service.impl;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -9,6 +10,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,24 +23,31 @@ import com.innowise.orderservice.dto.response.OrderResponse;
 import com.innowise.orderservice.service.OrderService;
 
 import com.innowise.orderservice.client.UserIntegrationService;
+import com.innowise.orderservice.consumer.CreatePaymentEvent;
+import com.innowise.orderservice.consumer.PaymentStatus;
 import com.innowise.orderservice.exception.conflict.InvalidOrderStateException;
 import com.innowise.orderservice.exception.security.ForbiddenException;
 import com.innowise.orderservice.mapper.OrderCommandMapper;
 import com.innowise.orderservice.mapper.OrderMapper;
+import com.innowise.orderservice.mapper.ProcessedPaymentEventMapper;
 import com.innowise.orderservice.model.Order;
 import com.innowise.orderservice.model.enums.OrderStatus;
 import com.innowise.orderservice.persistence.OrderPersistence;
+import com.innowise.orderservice.repository.ProcessedPaymentEventRepository;
 import com.innowise.orderservice.repository.specification.OrderSpecification;
 import com.innowise.orderservice.security.SecurityUtils;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * Default implementation of {@link OrderService}.
- * <p>
- * Loads and validates users via {@link UserIntegrationService}, applies owner/admin access rules,
- * and maps entities to API responses. Status changes use {@link OrderStatus} transition rules.
+ * Default implementation of order application operations.
+ *
+ * <p>Coordinates order persistence, access validation, user enrichment, and payment-event
+ * processing. The service owns order state transitions and delegates persistence concerns to
+ * {@link com.innowise.orderservice.persistence.OrderPersistence}.</p>
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -47,10 +56,9 @@ public class OrderServiceImpl implements OrderService {
     private final UserIntegrationService userIntegrationService;
     private final OrderMapper orderMapper;
     private final OrderCommandMapper orderCommandMapper;
+    private final ProcessedPaymentEventRepository processedPaymentRepository;
+    private final ProcessedPaymentEventMapper processedPaymentEventMapper;
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public OrderResponse createOrder(UUID userId, CreateOrderRequest request) {
         UserResponse user = userIntegrationService.getInternalUserById(userId);
@@ -58,9 +66,6 @@ public class OrderServiceImpl implements OrderService {
         return orderMapper.toResponse(order, user);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public OrderResponse getOrderById(UUID orderId, UUID currentUserId) {
         Order order = orderPersistence.findById(orderId);
@@ -70,9 +75,11 @@ public class OrderServiceImpl implements OrderService {
         return toResponseWithUser(order);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
+    public BigDecimal getOrderTotalPrice(UUID orderId, UUID userId) {
+        return orderPersistence.getOrderTotalPriceByOrderIdAndUserId(orderId, userId);
+    }
+
     @Override
     public Page<OrderResponse> getOrders(
             OrderSearchFilterRequest filter,
@@ -86,9 +93,6 @@ public class OrderServiceImpl implements OrderService {
         return findOrdersWithUserEnrichment(filter, pageable, userFilter);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Page<OrderResponse> getOrdersByUserId(
             OrderSearchFilterRequest filter,
@@ -98,9 +102,6 @@ public class OrderServiceImpl implements OrderService {
         return findOrdersWithUserEnrichment(filter, pageable, userId);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public OrderResponse updateOrder(
@@ -122,9 +123,6 @@ public class OrderServiceImpl implements OrderService {
         return toResponseWithUser(updated);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     @Transactional
     public OrderResponse updateOrderStatus(
@@ -154,17 +152,11 @@ public class OrderServiceImpl implements OrderService {
         return toResponseWithUser(updated);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void deleteOrder(UUID orderId) {
         orderPersistence.deleteById(orderId);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void deleteOrdersForUser(UUID userId) {
         orderPersistence.deleteAllByUserId(userId);
@@ -177,6 +169,62 @@ public class OrderServiceImpl implements OrderService {
         if (!isOwner && !isAdmin) {
             throw new ForbiddenException("No access to this order");
         }
+    }
+
+    @Override
+    @Transactional
+    public void processPaymentEvent(CreatePaymentEvent createPaymentEvent) {
+        String paymentId = createPaymentEvent.paymentId();
+
+        if (processedPaymentRepository.existsById(paymentId)) {
+            log.debug(
+                "Skipping already processed payment event: paymentId={}, orderId={}, status={}",
+                paymentId,
+                createPaymentEvent.orderId(),
+                createPaymentEvent.status()
+            );
+            return;
+        }
+
+        try {
+            processedPaymentRepository.saveAndFlush(processedPaymentEventMapper.toEntity(createPaymentEvent));
+        } catch (DataIntegrityViolationException duplicatePayment) {
+            log.debug(
+                "Skipping duplicate payment event: paymentId={}, orderId={}, status={}",
+                paymentId,
+                createPaymentEvent.orderId(),
+                createPaymentEvent.status()
+            );
+            return;
+        }
+
+        if (createPaymentEvent.status() == PaymentStatus.FAILED) {
+            log.debug(
+                "Ignoring failed payment attempt for order state update: paymentId={}, orderId={}",
+                paymentId,
+                createPaymentEvent.orderId()
+            );
+            return;
+        }
+
+        Order order = orderPersistence.findById(UUID.fromString(createPaymentEvent.orderId()));
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus == OrderStatus.CONFIRMED) {
+            return;
+        }
+
+        if (currentStatus != OrderStatus.PENDING) {
+            log.warn(
+                "Skipping successful payment event for non-pending order: paymentId={}, orderId={}, currentStatus={}",
+                createPaymentEvent.paymentId(),
+                createPaymentEvent.orderId(),
+                currentStatus
+            );
+            return;
+        }
+
+        order.setStatus(OrderStatus.CONFIRMED);
+        orderPersistence.save(order);
     }
 
     private OrderResponse toResponseWithUser(Order order) {

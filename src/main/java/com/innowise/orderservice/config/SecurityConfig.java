@@ -5,9 +5,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import com.innowise.orderservice.security.HeaderAuthenticationFilter;
 
@@ -18,22 +20,27 @@ public class SecurityConfig {
     private static final String ADMIN_ROLE = "ADMIN";
 
     @Bean
+    public WebSecurityCustomizer actuatorWebSecurityCustomizer() {
+        return web -> web.ignoring()
+            .requestMatchers(
+                PathPatternRequestMatcher.pathPattern("/actuator/health/**"),
+                PathPatternRequestMatcher.pathPattern("/actuator/info")
+            );
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, HeaderAuthenticationFilter headerAuthenticationFilter) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/actuator/health",
-                    "/actuator/info"
-                ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/orders/internal/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/orders").authenticated()
                 .requestMatchers(HttpMethod.GET, "/orders/user/**").hasRole(ADMIN_ROLE)
                 .requestMatchers(HttpMethod.DELETE, "/orders/**").hasRole(ADMIN_ROLE)
                 .anyRequest().authenticated()
             )
             .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-   
 
         return http.build();
     }

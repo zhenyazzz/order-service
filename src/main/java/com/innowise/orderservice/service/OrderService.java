@@ -1,5 +1,6 @@
 package com.innowise.orderservice.service;
 
+import com.innowise.orderservice.consumer.CreatePaymentEvent;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderSearchFilterRequest;
 import com.innowise.orderservice.dto.request.UpdateOrderRequest;
@@ -8,6 +9,7 @@ import com.innowise.orderservice.dto.response.OrderResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -32,6 +34,15 @@ public interface OrderService {
      * @param currentUserId  authenticated user performing the request
      */
     OrderResponse getOrderById(UUID orderId, UUID currentUserId);
+
+    /**
+     * Returns total price of user's order for internal service-to-service usage.
+     *
+     * @param orderId order identifier
+     * @param userId owner identifier
+     * @return current total order price
+     */
+    BigDecimal getOrderTotalPrice(UUID orderId, UUID userId);
 
     /**
      * Page of orders matching the filter. Non-admin callers only see their own orders;
@@ -101,4 +112,11 @@ public interface OrderService {
      * @param userId user whose orders are removed
      */
     void deleteOrdersForUser(UUID userId);
+    
+    /**
+     * Processes a payment event.
+     *
+     * @param createPaymentEvent payment event
+     */
+    void processPaymentEvent(CreatePaymentEvent createPaymentEvent);
 }

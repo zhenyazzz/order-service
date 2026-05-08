@@ -9,12 +9,14 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.innowise.orderservice.dto.internal.InternalOrderPriceResponse;
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderSearchFilterRequest;
 import com.innowise.orderservice.dto.request.UpdateOrderRequest;
@@ -69,6 +71,16 @@ public class OrderController {
         return ResponseEntity.ok(
                 orderService.getOrderById(id, SecurityUtils.getCurrentUserId())
         );
+    }
+
+    /**
+     * Internal endpoint for service-to-service access to current order total.
+     */
+    @GetMapping("/internal/{id}/total-price")
+    public ResponseEntity<InternalOrderPriceResponse> getOrderTotalPrice(
+            @PathVariable UUID id,
+            @RequestHeader("X-User-Id") UUID userId) {
+        return ResponseEntity.ok(new InternalOrderPriceResponse(orderService.getOrderTotalPrice(id, userId)));
     }
 
     /**

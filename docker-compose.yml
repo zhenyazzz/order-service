@@ -45,7 +45,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-order_service_secret}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://host.docker.internal:8082}
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://host.docker.internal:8081}
     depends_on:
       order-service-postgresql:
         condition: service_healthy

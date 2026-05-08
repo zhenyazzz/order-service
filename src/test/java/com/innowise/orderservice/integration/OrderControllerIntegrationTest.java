@@ -5,10 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.innowise.orderservice.dto.request.CreateOrderRequest;
 import com.innowise.orderservice.dto.request.OrderItemRequest;
@@ -16,6 +18,7 @@ import com.innowise.orderservice.dto.request.UpdateOrderRequest;
 import com.innowise.orderservice.dto.request.UpdateOrderStatusRequest;
 import com.innowise.orderservice.dto.response.OrderResponse;
 import com.innowise.orderservice.model.enums.OrderStatus;
+import com.innowise.orderservice.repository.OrderRepository;
 import com.innowise.orderservice.utils.OrderTestDataFactory;
 
 @DisplayName("Order API integration tests (Controller → Service → Repository → DB)")
@@ -28,6 +31,27 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
     private static final UUID ORDER_CANCELLED_B = UUID.fromString("aaaaaaaa-0003-4003-8003-000000000003");
     private static final UUID USER_C_NO_SEED = UUID.fromString("cccccccc-cccc-4ccc-8ccc-ccccccccccc1");
     private static final UUID ITEM_DEMO_GADGET = UUID.fromString("22222222-2222-4222-8222-222222222222");
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @BeforeEach
+    void resetSeedOrdersState() {
+        orderRepository.findById(ORDER_PENDING_A).ifPresent(o -> {
+            o.setStatus(OrderStatus.PENDING);
+            orderRepository.save(o);
+        });
+
+        orderRepository.findById(ORDER_CONFIRMED_A).ifPresent(o -> {
+            o.setStatus(OrderStatus.CONFIRMED);
+            orderRepository.save(o);
+        });
+
+        orderRepository.findById(ORDER_CANCELLED_B).ifPresent(o -> {
+            o.setStatus(OrderStatus.CANCELLED);
+            orderRepository.save(o);
+        });
+    }
 
     private void stubSeedUsersBatch() {
         stubInternalUsersByIds("[" + userResponseJson(USER_A, "Test", "buyer@example.com") + ","
@@ -45,7 +69,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                 .header("X-User-Id", userId.toString())
                 .header("X-User-Email", email)
                 .header("X-User-Roles", "ROLE_USER")
-                .header("Idempotency-Key", idempotencyKey)
+                .header("X-Idempotency-Key", idempotencyKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -78,7 +102,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when Idempotency-Key is missing returns 400")
+        @DisplayName("when X-Idempotency-Key is missing returns 400")
         void whenIdempotencyKeyMissing_returns400() {
             stubInternalUserById(USER_A, "Test", OrderTestDataFactory.USER_EMAIL);
 
@@ -95,7 +119,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("when Idempotency-Key repeats returns cached response")
+        @DisplayName("when X-Idempotency-Key repeats returns cached response")
         void whenSameIdempotencyKey_returnsCachedResponse() {
             String idemKey = UUID.randomUUID().toString();
 
@@ -214,6 +238,64 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                         assertThat(response.user()).isNotNull();
                         assertThat(response.user().id()).isEqualTo(USER_A);
                     });
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /orders/internal/{id}/total-price")
+    class GetOrderTotalPrice {
+
+        @Test
+        @DisplayName("when X-User-Id matches order owner returns 200 with total price")
+        void whenOwnerHeaderProvided_returns200WithTotalPrice() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", ORDER_PENDING_A)
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectBody()
+                    .jsonPath("$.totalPrice").isEqualTo(45.50);
+        }
+
+        @Test
+        @DisplayName("when X-User-Id does not own order returns 404")
+        void whenUserDoesNotOwnOrder_returns404() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", ORDER_PENDING_A)
+                    .header("X-User-Id", USER_B.toString())
+                    .header("X-User-Email", "other@example.com")
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isNotFound();
+        }
+
+        @Test
+        @DisplayName("when order id does not exist returns 404")
+        void whenOrderMissing_returns404() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", UUID.fromString("dddddddd-0001-4001-8001-000000000001"))
+                    .header("X-User-Id", USER_A.toString())
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isNotFound();
+        }
+
+        @Test
+        @DisplayName("when X-User-Id header is missing returns 400")
+        void whenUserIdHeaderMissing_returns400() {
+            webTestClient
+                    .get()
+                    .uri("/orders/internal/{id}/total-price", ORDER_PENDING_A)
+                    .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
+                    .header("X-User-Roles", "ROLE_USER")
+                    .exchange()
+                    .expectStatus().isBadRequest();
         }
     }
 
@@ -390,7 +472,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(update)
                     .exchange()
@@ -419,7 +501,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_B.toString())
                     .header("X-User-Email", "other@example.com")
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(update)
                     .exchange()
@@ -442,7 +524,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_B.toString())
                     .header("X-User-Email", "other@example.com")
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(update)
                     .exchange()
@@ -472,7 +554,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -497,7 +579,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -509,7 +591,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -533,7 +615,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -555,7 +637,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_B.toString())
                     .header("X-User-Email", "other@example.com")
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(new UpdateOrderStatusRequest(OrderStatus.CANCELLED))
                     .exchange()
@@ -578,7 +660,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .exchange()
                     .expectStatus().isNoContent();
 
@@ -624,7 +706,7 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_ADMIN")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .exchange()
                     .expectStatus().isNoContent();
 
@@ -652,13 +734,13 @@ class OrderControllerIntegrationTest extends AbstractIntegrationTest {
                     .header("X-User-Id", USER_A.toString())
                     .header("X-User-Email", OrderTestDataFactory.USER_EMAIL)
                     .header("X-User-Roles", "ROLE_USER")
-                    .header("Idempotency-Key", UUID.randomUUID().toString())
+                    .header("X-Idempotency-Key", UUID.randomUUID().toString())
                     .exchange()
                     .expectStatus().isForbidden();
         }
 
         @Test
-        @DisplayName("when Idempotency-Key is missing returns 400")
+        @DisplayName("when X-Idempotency-Key is missing returns 400")
         void whenIdempotencyKeyMissing_returns400() {
             webTestClient
                     .delete()
